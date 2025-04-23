@@ -1,0 +1,2078 @@
+#include <stdlib.h>
+#include <cmath>
+
+
+#include <g2o/core/sparse_optimizer.h>
+#include <g2o/core/block_solver.h>
+#include <g2o/core/factory.h>
+#include <g2o/core/optimization_algorithm_factory.h>
+#include <g2o/core/optimization_algorithm_gauss_newton.h>
+#include <g2o/core/optimization_algorithm_levenberg.h>
+#include <g2o/solvers/csparse/linear_solver_csparse.h>
+#include <g2o/types/slam2d/parameter_se2_offset.h>
+#include <g2o/core/optimizable_graph.h>
+#include <g2o/types/slam2d/vertex_se2.h>
+#include <g2o/types/slam2d/edge_se2.h>
+#include <g2o/types/slam3d/vertex_se3.h>
+#include <g2o/types/slam3d/edge_se3.h>
+#include <g2o/types/slam3d/parameter_se3_offset.h>
+#include <g2o/types/slam3d/vertex_pointxyz.h>
+#include <g2o/types/slam3d/edge_se3_pointxyz_distance.h>
+#include <g2o/types/slam3d/edge_se3_distance.h>
+
+
+#include <carmen/carmen.h>
+#include <carmenx/ambisense_slam/ambisense_slam_interface.h>
+#include <xstream/z.h>
+#include <xstream/bz.h>
+#include <gzstream/gzstream.h>
+#include <set>
+#include <fstream>
+#include <sstream>
+#include <cstdlib>
+#include <algorithm>
+#include <iostream>
+#include <utils/gnuplot/gnuplot.h>
+#include <utils/text/font_style.h>
+#include <utils/text/to_string.h>
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <mysql/my_global.h>
+#include <mysql/mysql.h>
+#include <string>
+#include <time.h>
+#include <stdio.h>
+#include <conversion.h>
+
+#include <GeographicLib/Geocentric.hpp>
+#include <GeographicLib/LocalCartesian.hpp>
+using namespace GeographicLib;
+
+
+
+using namespace std;
+using namespace g2o;
+
+
+/** Information of a mobile APP scanning */
+class MobileScanning
+{
+public:
+	MobileScanning()
+{
+
+}
+	std::map< std::string, int > cell_scan;//cell id and the RSS
+	std::map< std::string, int > wifi_scan;//wifi mac address and rss
+	std::map<std::string, int> frequency;//wifi frequency
+
+	double longitude;//GPS coordinates:longitude
+	double latitude;//GPS coordinates:latitude
+	double x;//the x
+	double y;//the y
+	double z;//the z
+
+	double accumulated_dist;
+
+	double odom_x;
+	double odom_y;
+	double odom_z;
+
+
+	int index_robot;
+	int active_earfcn;//indicates the active earfcn in a scan
+	int sensor_integrated;
+	int gt_found;
+};
+
+/** Recording the robot odometry */
+class RobotOdom
+{
+public:
+	RobotOdom()
+{
+
+}
+	double x;
+	double y;
+	double z;
+	double roll;
+	double pitch;
+	double yaw;
+	double qx;
+	double qy;
+	double qz;
+	double qw;
+	double timestamp;//time stamp is in double and in seconds
+	double accumulated_dist;
+};
+
+
+std::map<int, RobotOdom > m_robot_odometry;//raw robot odometry
+
+std::map< long int, MobileScanning > m_radio_fingerprints;//recording the radio fingerprints
+
+std::map< long int, MobileScanning > m_radio_fingerprints_extended;
+
+
+
+//record the optimized odometry
+std::map<int, RobotOdom > m_robot_odometry_optimized;//raw robot odometry
+
+
+
+//record the optimized odometry
+std::map<int, RobotOdom > m_robot_ground_truth;//robot ground truth we get from AMCL
+
+int m_record_count_ground_truth=0;//number of lines recording the ground truth
+
+//record the optimized results
+std::map< long int, MobileScanning > m_radio_fingerprints_optimized;
+
+
+int number_records=0;
+
+
+int m_record_count=0;//number of nodes in the graph
+
+int m_odom_record;//number of odom nodes in the graph, anything higher this number will be regarded as the landmark
+
+std::string m_username;
+
+//record fingerprints file name
+char *m_fingerprints_file_name;
+
+//record robot odo file name
+char *m_robot_odom_file_name;
+
+//the robot ground truth file path
+char *m_robot_ground_truth_file;
+
+double min_cell_verify_rss=INFINITY;
+
+//gnuplot
+GnuplotInterface * m_plot_samples= new GnuplotInterface();
+
+GnuplotInterface * m_plot_alligned= new GnuplotInterface();
+
+
+GnuplotInterface * m_plot_similarity_model= new GnuplotInterface();
+
+
+
+std::map < int, g2o::SE3Quat > m_raw_se3quat_pose;//vertex--->pose, before optimization
+std::map < int, g2o::SE3Quat > m_optimized_se3quat_pose;//vertex--->pose, after optimization
+
+
+std::map <std::string, int > m_mac_counter;
+
+std::map <std::string, int > m_lte_counter;
+
+/** Sample of a distance-->similarity measure */
+class SimilartyDistance
+{
+public:
+	SimilartyDistance()
+{
+}
+	double similarity;
+	double distance;
+	double delta_x;
+	double delta_y;
+	double delta_z;
+};
+
+/** similarty-->variance */
+class SimilartyVariance
+{
+public:
+	SimilartyVariance()
+{
+}
+	double similarity;
+	double variance;
+	double mean;
+};
+
+std::vector < SimilartyDistance > m_similarty_distance_samples;
+
+std::vector < SimilartyVariance > m_similarty_model;
+
+
+// --------------------------------------------------------------------------
+void plot_similarity_model(std::vector < SimilartyVariance > similarty_variance)
+// --------------------------------------------------------------------------
+{
+
+	string cmd;//( "set size ratio 1\n");
+	cmd+="set grid\n";
+	cmd+="set xlabel 'similarity'\n";
+	cmd+="set ylabel 'distance'\n";
+	cmd+="set xrange [0:1]\n";
+	//cmd+="set yrange [-80:60]\n";
+	cmd+="set size ratio 0.5\n";
+
+
+	cmd+="plot '-' u 1:2 w lp pt 2 lw 1 lt 2 lc 3 ti 'Similarity model',\n";
+
+	for(int i=0; i< similarty_variance.size(); i++)
+	{
+
+		cmd += toString( similarty_variance[i].similarity ) + ' ' + toString( similarty_variance[i].mean ) + ' ' + toString( 0 ) + '\n';
+		//	std::cout<<"raw:"<<pose_se3quat.translation()[0]<<" "<<pose_se3quat.translation()[1]<<" "<<pose_se3quat.translation()[2]<<std::endl;
+	}
+
+	cmd += "e\n";
+
+
+	m_plot_similarity_model->commandStr( cmd);
+
+}
+
+
+
+// --------------------------------------------------------------------------
+void plot_track_alignment(std::vector < carmen_point_t > ground_truth,
+		std::vector < carmen_point_t > estimation)
+// --------------------------------------------------------------------------
+{
+
+	string cmd;//( "set size ratio 1\n");
+	cmd+="set grid\n";
+	cmd+="set xlabel 'x(m)'\n";
+	cmd+="set ylabel 'y(m)'\n";
+	cmd+="set xrange [-30:45]\n";
+	cmd+="set yrange [-80:60]\n";
+	cmd+="set size ratio -1\n";
+
+	std::map < int, g2o::SE3Quat >::iterator it_;
+
+
+	cmd+="plot '-' u 1:2 w p pt 2 lw 1 lt 2 lc 3 ti 'Ground Truth','-' u 1:2 w p pt 6 lw 1 lt 1 lc 1 ti 'Optimized Track',\n";
+
+	for(int i=0; i< ground_truth.size(); i++)
+	{
+
+		cmd += toString( ground_truth[i].x ) + ' ' + toString( ground_truth[i].y ) + ' ' + toString( 0 ) + '\n';
+		//std::cout<<"raw:"<<ground_truth[i].x<<" "<<ground_truth[i].y<<std::endl;
+	}
+
+	cmd += "e\n";
+
+	for(int i=0; i< estimation.size(); i++)
+	{
+
+		cmd += toString( estimation[i].x ) + ' ' + toString( estimation[i].y ) + ' ' + toString( 0 ) + '\n';
+		//std::cout<<"optimized:"<<estimation[i].x<<" "<<estimation[i].y<<std::endl;
+
+	}
+
+	cmd += "e\n";
+
+	m_plot_alligned->commandStr( cmd);
+
+}
+
+
+
+
+
+// --------------------------------------------------------------------------
+int
+read_parameters_from_command_line( int argc, char **argv )
+// --------------------------------------------------------------------------
+{
+	carmen_read_commandline_parameters( argc, argv );
+
+	if(carmen_find_param("fingerprints") && carmen_find_param_pair("fingerprints"))
+	{
+		m_fingerprints_file_name=carmen_process_param_string( "fingerprints", NULL);
+	}
+	else
+	{
+		std::cout<<"Please specify the fingerprints file name using -fingerprints"<<std::endl;
+		exit(0);
+	}
+
+	if(carmen_find_param("robotOdom") && carmen_find_param_pair("robotOdom"))
+	{
+		m_robot_odom_file_name=carmen_process_param_string( "robotOdom", NULL);
+	}
+	else
+	{
+		std::cout<<"Please specify the verification file name using -robotOdom"<<std::endl;
+		exit(0);
+	}
+
+	if(carmen_find_param("groundTruth") && carmen_find_param_pair("groundTruth"))
+	{
+		m_robot_ground_truth_file=carmen_process_param_string( "groundTruth", NULL);
+	}
+	else
+	{
+		std::cout<<"Please specify the verification file name using -groundTruth"<<std::endl;
+		exit(0);
+	}
+
+
+	return 0;
+}
+
+
+// --------------------------------------------------------------------------
+void sciroco_generate_time_based_random_seed()
+// --------------------------------------------------------------------------
+{
+	unsigned int seed;
+	struct timeval tv;
+
+	if ( gettimeofday(&tv, NULL) < 0 )
+		fprintf( stderr, "error in gettimeofday : %s\n", strerror( errno) );
+	seed = tv.tv_sec + tv.tv_usec;
+	srand( seed );
+}
+
+
+// --------------------------------------------------------------------------
+void loadGroundTruth(char * model_name)
+// --------------------------------------------------------------------------
+{
+
+	std::string modelFileName(model_name);
+	std::string         line, key_word;
+	std::istringstream  iss_line;
+
+	std::ifstream model_in( modelFileName.c_str(), std::ios::in );
+
+	if ( ! model_in )
+	{
+		std::cerr << "Sensor model file " << modelFileName << " not found, please re-check it." << std::endl;
+		exit(0);
+	}
+
+	xstream::bz::istreambuf * bz_ibuf = NULL;
+	std::istream                 * fin     = NULL;
+
+	// Open log file as gzipped/bzipped/raw ASCII stream depending on its extension
+	if ( modelFileName.find( ".gz" ) == modelFileName.length() - 3 )
+	{
+		model_in.close();
+		fin = new igzstream( modelFileName.c_str() );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening gzipped file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+	}
+	else if ( modelFileName.find( ".bz2" ) == modelFileName.length() - 4 )
+	{
+		bz_ibuf = new xstream::bz::istreambuf( model_in.rdbuf() );
+		fin = new std::istream( bz_ibuf );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening bzipped file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+		fin->exceptions( std::ios::badbit );
+	}
+	else
+	{
+		fin = new std::istream( model_in.rdbuf() );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening regular file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+	}
+
+	// load key parameters
+	size_t key_word_separator;
+	uint   line_count = 0;
+	uint   total_line_count = 0;
+
+	while ( fin->good() )
+	{
+		iss_line.clear();
+		getline( *fin, line );
+
+		total_line_count++;
+		// Filter out comment lines
+		if ( line.length() == 0 || line[0] == '#' )
+			continue;
+
+		// Now, all remaining lines have a key word in their beginning,
+		// followed by white spaces and the rest of the data
+		key_word_separator = line.find( ' ' );
+		if ( key_word_separator == std::string::npos )
+			continue;
+
+		iss_line.str( line );
+
+		RobotOdom odom;
+		double timestamp, x, y, z, roll, pitch, yaw, qx, qy, qz, qw;
+		long int timestamp_long;
+		long int timestamp_head_long;
+		string frame;
+		int frame_id;
+
+
+		iss_line >> timestamp_long;
+		iss_line >> frame_id;
+		iss_line >> timestamp_head_long;
+		iss_line >> frame;			
+
+		iss_line >> x;
+		iss_line >> y;
+		iss_line >> z;
+
+		timestamp=timestamp_long/1000000000.0;
+
+		odom.timestamp=timestamp;
+		odom.x=x;
+		odom.y=y;
+		odom.z=z;			
+
+		m_robot_ground_truth[m_record_count_ground_truth]=odom;		
+
+
+		m_record_count_ground_truth=m_record_count_ground_truth+1;
+
+	}
+
+
+}
+
+// --------------------------------------------------------------------------
+void loadRobotOdom(char * model_name)
+// --------------------------------------------------------------------------
+{
+	std::string modelFileName(model_name);
+	std::string         line, key_word;
+	std::istringstream  iss_line;
+
+	std::ifstream model_in( modelFileName.c_str(), std::ios::in );
+
+	if ( ! model_in )
+	{
+		std::cerr << "Sensor model file " << modelFileName << " not found, please re-check it." << std::endl;
+		exit(0);
+	}
+
+	xstream::bz::istreambuf * bz_ibuf = NULL;
+	std::istream                 * fin     = NULL;
+
+	// Open log file as gzipped/bzipped/raw ASCII stream depending on its extension
+	if ( modelFileName.find( ".gz" ) == modelFileName.length() - 3 )
+	{
+		model_in.close();
+		fin = new igzstream( modelFileName.c_str() );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening gzipped file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+	}
+	else if ( modelFileName.find( ".bz2" ) == modelFileName.length() - 4 )
+	{
+		bz_ibuf = new xstream::bz::istreambuf( model_in.rdbuf() );
+		fin = new std::istream( bz_ibuf );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening bzipped file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+		fin->exceptions( std::ios::badbit );
+	}
+	else
+	{
+		fin = new std::istream( model_in.rdbuf() );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening regular file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+	}
+
+	// load key parameters
+	size_t key_word_separator;
+
+	int   total_line_count = 0;
+
+	while ( fin->good() )
+	{
+		iss_line.clear();
+		getline( *fin, line );
+
+		// Filter out comment lines
+		if ( line.length() == 0 || line[0] == '#' )
+			continue;
+
+		// Now, all remaining lines have a key word in their beginning,
+		// followed by white spaces and the rest of the data
+		key_word_separator = line.find( ' ' );
+		if ( key_word_separator == std::string::npos )
+			continue;
+
+		iss_line.str( line );
+
+		RobotOdom odom;
+		double timestamp, x, y, z, roll, pitch, yaw, qx, qy, qz, qw;
+
+		iss_line >> timestamp;
+		iss_line >> x;
+		iss_line >> y;
+		iss_line >> z;
+		iss_line >> roll;
+		iss_line >> pitch;
+		iss_line >> yaw;
+		iss_line >> qx;
+		iss_line >> qy;
+		iss_line >> qz;
+		iss_line >> qw;
+
+		odom.timestamp=timestamp;
+		odom.x=x;
+		odom.y=y;
+		odom.z=z;
+		odom.roll=roll;
+		odom.pitch=pitch;
+		odom.yaw=yaw;
+
+		odom.qx=qx;
+		odom.qy=qy;
+		odom.qz=qz;
+		odom.qw=qw;
+
+		//std::cout<<odom.timestamp<<" "<<odom.x<<" "<<odom.y<<" "<<odom.z<<" "<<odom.yaw<<std::endl;
+		//printf("%.10f\n", odom.timestamp);
+
+		//if(total_line_count%10==0)
+		{
+			m_robot_odometry[m_record_count]=odom;
+			m_record_count=m_record_count+1;
+		}
+
+		total_line_count=total_line_count+1;
+
+	}
+
+}
+
+
+
+// --------------------------------------------------------------------------
+void loadFingerprints(char * model_name)
+// --------------------------------------------------------------------------
+{
+	std::string modelFileName(model_name);
+	std::string         line, key_word;
+	std::istringstream  iss_line;
+
+	std::ifstream model_in( modelFileName.c_str(), std::ios::in );
+
+	if ( ! model_in )
+	{
+		std::cerr << "Sensor model file " << modelFileName << " not found, please re-check it." << std::endl;
+		exit(0);
+	}
+
+	xstream::bz::istreambuf * bz_ibuf = NULL;
+	std::istream                 * fin     = NULL;
+
+	// Open log file as gzipped/bzipped/raw ASCII stream depending on its extension
+	if ( modelFileName.find( ".gz" ) == modelFileName.length() - 3 )
+	{
+		model_in.close();
+		fin = new igzstream( modelFileName.c_str() );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening gzipped file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+	}
+	else if ( modelFileName.find( ".bz2" ) == modelFileName.length() - 4 )
+	{
+		bz_ibuf = new xstream::bz::istreambuf( model_in.rdbuf() );
+		fin = new std::istream( bz_ibuf );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening bzipped file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+		fin->exceptions( std::ios::badbit );
+	}
+	else
+	{
+		fin = new std::istream( model_in.rdbuf() );
+		if ( ! fin )
+		{
+			std::cerr << "Error opening regular file:" << modelFileName  << std::endl;
+			exit(0);
+		}
+	}
+
+	// load key parameters
+	size_t key_word_separator;
+	uint   line_count = 0;
+	uint   total_line_count = 0;
+
+	while ( fin->good() )
+	{
+		iss_line.clear();
+		getline( *fin, line );
+
+		total_line_count++;
+		// Filter out comment lines
+		if ( line.length() == 0 || line[0] == '#' )
+			continue;
+
+		// Now, all remaining lines have a key word in their beginning,
+		// followed by white spaces and the rest of the data
+		key_word_separator = line.find( ' ' );
+		if ( key_word_separator == std::string::npos )
+			continue;
+
+		iss_line.str( line );
+
+		//we extract the content of the measurements
+		long int timestamp;
+		std::map< std::string, int > wifi_scan;//wifi mac address and rss
+		std::map< std::string, int > wifi_frequency;//wifi mac address and frequency
+		int mcc,mnc,eci,ucid,band,dBm,tac,earfcn,uarfcn,rsrp,rsrq,rssnr,cqi,ta,lac,cid,num_wifi_mac;
+		string registered;
+		string imei;
+		string psc;
+		string pci;
+		string unique_cell_id;
+		double lat, lon, accuracy, ori_x, ori_y, ori_z;
+
+		//time,MCC,MNC,ECI,UCID,Band,dBm,isRegistered,PCI,TAC,earfcn,uarfcn,rsrp,rsrq,rssnr,cqi,ta,lac,PSC,Lat,Lon,WIFI
+
+		iss_line >> imei;
+		iss_line >> timestamp;
+		iss_line >> mcc;
+		iss_line >> mnc;
+		iss_line >> eci;
+		iss_line >> ucid;
+		iss_line >> band;
+		iss_line >> dBm;
+		iss_line >> registered;
+		iss_line >> pci;
+		iss_line >> tac;
+		iss_line >> earfcn;
+		iss_line >> uarfcn;
+		iss_line >> rsrp;
+		iss_line >> rsrq;
+		iss_line >> rssnr;
+		iss_line >> cqi;
+		iss_line >> ta;
+		iss_line >> lac;
+		iss_line >> psc;
+		iss_line >> lat;
+		iss_line >> lon;
+		iss_line >> accuracy;
+		iss_line >> ori_x;
+		iss_line >> ori_y;
+		iss_line >> ori_z;
+		iss_line >>num_wifi_mac;
+
+
+		if(dBm<min_cell_verify_rss)
+		{
+			min_cell_verify_rss=dBm;
+		}
+
+		if(uarfcn!=0)
+		{
+			unique_cell_id="psc_"+psc+"_"+toString(uarfcn)+"_"+toString(band);
+		}
+		else
+		{
+			if(earfcn!=0)
+			{
+				unique_cell_id="pci_"+pci+"_"+toString(earfcn)+"_"+toString(band);
+
+			}
+			else
+			{
+				unique_cell_id="not_valid";
+			}
+
+		}
+
+		for(int i=0;i<num_wifi_mac;i++)
+		{
+			string mac_address;
+			int frequency;
+			int rss;
+			iss_line >>mac_address;
+			iss_line >>frequency;
+			iss_line >>rss;
+
+			wifi_scan[mac_address]=rss;
+			wifi_frequency[mac_address]=frequency;
+
+		}
+
+		if(band>0)
+		{
+			if(uarfcn!=0)
+			{
+				if(dBm<0)
+				{
+					//m_radio_fingerprints[timestamp].cell_scan[unique_cell_id]=dBm;
+				}
+
+			}
+			else
+			{
+				if(dBm<0)
+					//	if(1)
+				{
+					//if(earfcn==3250||earfcn==3725||earfcn==1300||earfcn==1444||earfcn==3050)
+					m_radio_fingerprints[timestamp].cell_scan[unique_cell_id]=dBm;
+
+					m_lte_counter[unique_cell_id]=m_lte_counter[unique_cell_id]+1;
+					/*
+					if(registered=="true")
+					{
+						//m_ref_map_mobile_scan[timestamp].active_earfcn=;
+						//std::cout<<timestamp<<" "<<mcc<<" "<<mnc<<" "<<pci<<" "<<dBm<<" "<<earfcn<<" "<<registered<<" "<<m_radio_fingerprints[timestamp].active_earfcn<<std::endl;
+						m_radio_fingerprints[timestamp].active_earfcn=earfcn;
+						m_radio_fingerprints[timestamp].cell_scan[unique_cell_id]=dBm;
+
+					}
+					else
+					{
+						//we find the scan for the specific timestamp
+						std::map< long int, MobileScanning >::iterator it_mobile_scan;
+
+						it_mobile_scan=m_radio_fingerprints.find(timestamp);
+
+						if(it_mobile_scan!=m_radio_fingerprints.end())
+						{
+							int active_earfcn=it_mobile_scan->second.active_earfcn;
+							if(earfcn==active_earfcn)
+							{
+								m_radio_fingerprints[timestamp].cell_scan[unique_cell_id]=dBm;
+
+							}
+						}
+
+					}*/
+
+				}
+
+
+			}
+
+
+		}
+
+
+		m_radio_fingerprints[timestamp].longitude=lon;
+		m_radio_fingerprints[timestamp].latitude=lat;
+		m_radio_fingerprints[timestamp].sensor_integrated=0;
+
+		number_records=number_records+1;
+
+		std::map< std::string, int >::iterator iterator_wifi_scan;//iterator
+
+
+
+		for(iterator_wifi_scan = wifi_scan.begin(); iterator_wifi_scan != wifi_scan.end(); ++iterator_wifi_scan)
+		{
+			int min_rss=-100;
+
+			if(iterator_wifi_scan->second>min_rss)
+				if(iterator_wifi_scan->first!="d0:c6:37:09:62:3a")//this one is a mobile hotspot, has to be removed
+				{
+					m_radio_fingerprints[timestamp].wifi_scan[iterator_wifi_scan->first]=iterator_wifi_scan->second;
+					m_radio_fingerprints[timestamp].frequency[iterator_wifi_scan->first]=wifi_frequency[iterator_wifi_scan->first];
+					m_mac_counter[iterator_wifi_scan->first]=m_mac_counter[iterator_wifi_scan->first]+1;
+
+				}
+
+		}
+
+	}
+
+}
+
+// --------------------------------------------------------------------------
+double
+getCosineSimilarity(std::map< std::string, int > f1, std::map< std::string, int > f2)
+// --------------------------------------------------------------------------
+{
+	std::map< string, int >::iterator it_mac_rss;
+	//we first compute the sum of the first f1
+	double sum_f1=0;
+	double sum_f2=0;
+	double count_f1=0;
+	double count_f2=0;
+	double cross=0;
+
+	//we then compute the sum of the first f1
+	for(it_mac_rss = f1.begin();
+			it_mac_rss != f1.end(); it_mac_rss++)
+	{
+		sum_f1=sum_f1+(it_mac_rss->second)*(it_mac_rss->second);
+		count_f1=count_f1+1;
+		//std::cout<<it_mac_rss->first<<" "<<it_mac_rss->second<<std::endl;
+	}
+
+
+	for(it_mac_rss = f2.begin();
+			it_mac_rss != f2.end(); it_mac_rss++)
+	{
+		sum_f2=sum_f2+(it_mac_rss->second)*(it_mac_rss->second);
+		count_f2=count_f2+1;
+	}
+
+
+	int common_ap=0;
+	for(it_mac_rss = f1.begin();
+			it_mac_rss != f1.end(); it_mac_rss++)
+	{
+		std::map< string, int >::iterator it_ref_mac_rss;
+		it_ref_mac_rss=f2.find(it_mac_rss->first);
+		if(it_ref_mac_rss!=f2.end())
+		{
+			//we find the mac and we should caculate the cross of the value
+			cross=cross+(it_mac_rss->second)*(it_ref_mac_rss->second);
+			common_ap=common_ap+1;
+		}
+	}
+
+	if(common_ap<=0)
+	{
+		return 0.0;
+	}
+	else
+	{
+		double cos_similarity=cross/sqrt(sum_f1*sum_f2);
+		return cos_similarity;
+	}
+
+
+}
+
+// --------------------------------------------------------------------------
+double
+getGaussianSimilarity(std::map< std::string, int > f1, std::map< std::string, int > f2)
+// --------------------------------------------------------------------------
+{
+	std::map< string, int >::iterator it_mac_rss;
+	//we first compute the sum of the first f1
+
+	int number_cells=0;
+	double min_likelihood=0.001;
+	double sum_likelihood=0;
+	double sigma=4.0;
+
+	//
+	for(it_mac_rss = f1.begin();
+			it_mac_rss != f1.end(); it_mac_rss++)
+	{
+
+		std::map< string, int >::iterator it_ref_mac_rss;
+		it_ref_mac_rss=f2.find(it_mac_rss->first);
+		if(it_ref_mac_rss!=f2.end())
+		{
+			double current_likelihood=
+					exp( -0.5 * ( it_mac_rss->second - it_ref_mac_rss->second ) *( it_mac_rss->second - it_ref_mac_rss->second ) / (sigma*sigma) );
+			//we compute the likelihood given two rssi
+			if(current_likelihood<=min_likelihood)
+			{
+				current_likelihood=min_likelihood;
+			}
+
+			sum_likelihood=sum_likelihood+current_likelihood;
+			number_cells=number_cells+1;
+
+		}
+		else
+		{
+			sum_likelihood=sum_likelihood+min_likelihood;
+			number_cells=number_cells+1;
+		}
+
+	}
+
+	//
+	for(it_mac_rss = f2.begin();
+			it_mac_rss != f2.end(); it_mac_rss++)
+	{
+		std::map< string, int >::iterator it_ref_mac_rss;
+		it_ref_mac_rss=f1.find(it_mac_rss->first);
+		if(it_ref_mac_rss==f1.end())
+		{
+			sum_likelihood=sum_likelihood+min_likelihood;
+			//the cell id is not in f1
+			number_cells=number_cells+1;
+
+		}
+
+	}
+
+	//std::cout<<cross<<" "<<sum_f1<<" "<<sum_f2<<",common ap:"<<common_ap<<" "<<f1.rss_measure.size()<<" "<<f2.rss_measure.size()<<std::endl;
+	if(f1.size()<=0||f2.size()<=0||number_cells<=0)
+	{
+		return 0.0;
+	}
+	else
+	{
+		return sum_likelihood/((double)(number_cells));
+	}
+}
+
+// --------------------------------------------------------------------------
+int main( int argc, char** argv )
+// --------------------------------------------------------------------------
+{
+
+	sciroco_generate_time_based_random_seed(); // set random (!) random seed
+
+	read_parameters_from_command_line(argc,argv);
+
+	//load the fingerprints data
+
+	//load the configure file
+	loadFingerprints(m_fingerprints_file_name);
+
+	//load robot odom
+	loadRobotOdom(m_robot_odom_file_name);
+
+	//we need to load the ground truth based on AMCL
+	loadGroundTruth(m_robot_ground_truth_file);
+
+
+	std::map< int, RobotOdom >::iterator it_current_odom;
+
+	std::map< int, RobotOdom >::iterator it_ref_odom;
+
+
+	std::map< std::string, int >::iterator it_lte_address;
+
+	for(it_lte_address = m_lte_counter.begin(); it_lte_address != m_lte_counter.end(); it_lte_address++)
+	{
+		//std::cout<<it_lte_address->first<<" "<<it_lte_address->second<<std::endl;
+
+	}
+	//return 1;
+
+
+
+	//add the nodes in the graph
+	double accumulated_dist=0;
+	//we calculate the accumulated distacne
+	for(it_current_odom = m_robot_odometry.begin(); it_current_odom != m_robot_odometry.end(); it_current_odom++)
+	{
+
+		if(it_current_odom == m_robot_odometry.begin())
+		{
+			m_robot_odometry[it_current_odom->first].accumulated_dist=accumulated_dist;
+
+		}
+		else
+		{
+
+			it_ref_odom=m_robot_odometry.find(it_current_odom->first-1);
+			if(it_ref_odom!=m_robot_odometry.end())
+			{
+				//we caculated the distance moved
+				double previous_x=it_ref_odom->second.x;
+				double previous_y=it_ref_odom->second.y;
+				double previous_z=it_ref_odom->second.z;
+
+
+				double x=it_current_odom->second.x;
+				double y=it_current_odom->second.y;
+				double z=it_current_odom->second.z;
+
+				double dis_diff=sqrt((x-previous_x)*(x-previous_x)+(y-previous_y)*(y-previous_y) + (z-previous_z)*(z-previous_z));
+				accumulated_dist=accumulated_dist+dis_diff;
+				m_robot_odometry[it_current_odom->first].accumulated_dist=accumulated_dist;
+			}
+
+
+		}
+	}
+	std::cout<<"accumulated dist.."<<std::endl;
+
+
+	//	std::map< long int, MobileScanning > m_radio_fingerprints;//recording the radio fingerprints
+
+	std::map< long int, MobileScanning >::iterator it_current_fingerprint;
+	std::map< long int, MobileScanning >::iterator it_ref_fingerprint;
+
+	int m_extend_time_threshold=2500;//
+
+	//we find the first timestamp and records the last timestamp
+	long int min_timestamp=INFINITY;
+	long int max_timestamp=-INFINITY;
+
+	for(it_current_fingerprint = m_radio_fingerprints.begin(); it_current_fingerprint != m_radio_fingerprints.end(); it_current_fingerprint++)
+	{
+		if(it_current_fingerprint->first>max_timestamp)
+		{
+			max_timestamp=it_current_fingerprint->first;
+		}
+
+
+		if(it_current_fingerprint->first<min_timestamp)
+		{
+			min_timestamp=it_current_fingerprint->first;
+		}
+
+	}
+
+	int timeWindow=2500;
+
+	for(long int current_time=min_timestamp;current_time<=max_timestamp;current_time=current_time+timeWindow)
+	{
+		long int timestamp=current_time;
+		m_radio_fingerprints_extended[timestamp].sensor_integrated=0;
+		std::map< std::string, int >::iterator it_scan;
+		std::map< long int, MobileScanning >::iterator iterator_search;//iterator
+
+		//for wifi scan
+		std::map< std::string, int > wifi_scan;
+		std::map< std::string, std::vector<int> > v_wifi_scan;
+
+		for(iterator_search = m_radio_fingerprints.begin();
+				iterator_search != m_radio_fingerprints.end(); ++iterator_search)
+		{
+			int time_diff=fabs(iterator_search->first-timestamp);
+
+			if(time_diff<=m_extend_time_threshold)
+			{
+				//we store the cell id and rss
+				std::map< std::string, int > temp_wifi_scan=iterator_search->second.wifi_scan;
+
+				for(it_scan = temp_wifi_scan.begin();
+						it_scan != temp_wifi_scan.end(); ++it_scan)
+				{
+					v_wifi_scan[it_scan->first].push_back(it_scan->second);
+				}
+
+
+			}
+
+		}
+
+		std::map< std::string, std::vector<int> >::iterator it_wifi_scan_vector;
+		for(it_wifi_scan_vector = v_wifi_scan.begin();
+				it_wifi_scan_vector != v_wifi_scan.end(); ++it_wifi_scan_vector)
+		{
+			std::vector<int> v_rss=it_wifi_scan_vector->second;
+			double mean_rss=0;
+			double count=0;
+			double sum_rss=0;
+			for(int i=0;i<v_rss.size();i++)
+			{
+				sum_rss=sum_rss+v_rss[i];
+				count=count+1;
+			}
+			mean_rss=sum_rss/count;
+
+			m_radio_fingerprints_extended[timestamp].wifi_scan[it_wifi_scan_vector->first]=mean_rss;
+
+		}
+
+		//for cell scan
+		double measurement_in_duration=0;
+		std::map< std::string, int > cell_scan;
+		std::map< std::string, std::vector<int> > v_cell_scan;
+
+		for(iterator_search = m_radio_fingerprints.begin();
+				iterator_search != m_radio_fingerprints.end(); ++iterator_search)
+		{
+			int time_diff=fabs(iterator_search->first-timestamp);
+
+			if(time_diff<=m_extend_time_threshold)
+			{
+				//we store the cell id and rss
+				std::map< std::string, int > temp_cell_scan=iterator_search->second.cell_scan;
+
+				for(it_scan = temp_cell_scan.begin();
+						it_scan != temp_cell_scan.end(); ++it_scan)
+				{
+					v_cell_scan[it_scan->first].push_back(it_scan->second);
+				}
+
+				measurement_in_duration=measurement_in_duration+1;
+
+			}
+
+		}
+
+		std::map< std::string, std::vector<int> >::iterator it_cell_scan_vector;
+		for(it_cell_scan_vector = v_cell_scan.begin();
+				it_cell_scan_vector != v_cell_scan.end(); ++it_cell_scan_vector)
+		{
+			std::vector<int> v_rss=it_cell_scan_vector->second;
+			double mean_rss=0;
+			double count=0;
+			double sum_rss=0;
+			for(int i=0;i<v_rss.size();i++)
+			{
+				sum_rss=sum_rss+v_rss[i];
+				count=count+1;
+			}
+			mean_rss=sum_rss/count;
+
+			double detection_prob=count/measurement_in_duration;
+
+			m_radio_fingerprints_extended[timestamp].cell_scan[it_cell_scan_vector->first]=mean_rss;
+		}
+
+
+	}
+
+	std::cout<<m_radio_fingerprints.size()<<" "<<m_radio_fingerprints_extended.size()<<std::endl;
+
+	std::cout<<"Assign GT.."<<std::endl;
+
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+	{
+		//we only consider the sensor data if it is not integrated
+		long int timestamp_current=it_current_fingerprint->first;
+
+		double min_time_diff_current=INFINITY;
+		int best_index_current=-1;
+		//double time_diff= fabs( ((double)(mobile_timestamp))/1000.0 - m_robot_raw_odometry[i].timestamp);
+		//we find the closest odometry measurements with the timestamp
+		for(it_current_odom = m_robot_odometry.begin(); it_current_odom != m_robot_odometry.end(); it_current_odom++)
+		{
+			double time_diff= fabs( ((double)(timestamp_current))/1000.0 - it_current_odom->second.timestamp);
+			if(time_diff<=min_time_diff_current)
+			{
+				best_index_current=it_current_odom->first;
+				min_time_diff_current=time_diff;
+			}
+		}
+
+		if(best_index_current>=0&&min_time_diff_current<=1.0)
+		{
+			m_radio_fingerprints_extended[it_current_fingerprint->first].index_robot=best_index_current;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].odom_x=m_robot_odometry[best_index_current].x;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].odom_y=m_robot_odometry[best_index_current].y;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].odom_z=m_robot_odometry[best_index_current].z;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].accumulated_dist=m_robot_odometry[best_index_current].accumulated_dist;
+
+		}
+		else
+		{
+			m_radio_fingerprints_extended[it_current_fingerprint->first].index_robot=-1;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].accumulated_dist=-1;
+		}
+
+
+	}
+
+
+	//we need to get the ground truth for compare as well
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+	{
+		//we only consider the sensor data if it is not integrated
+		long int timestamp_current=it_current_fingerprint->first;
+
+		double min_time_diff_current=INFINITY;
+		int best_index_current=-1;
+		//double time_diff= fabs( ((double)(mobile_timestamp))/1000.0 - m_robot_raw_odometry[i].timestamp);
+		//we find the closest odometry measurements with the timestamp
+		for(it_current_odom = m_robot_ground_truth.begin(); it_current_odom != m_robot_ground_truth.end(); it_current_odom++)
+		{
+			double time_diff= fabs( ((double)(timestamp_current))/1000.0 - it_current_odom->second.timestamp);
+			if(time_diff<=min_time_diff_current)
+			{
+				best_index_current=it_current_odom->first;
+				min_time_diff_current=time_diff;
+			}
+		}
+
+		if(best_index_current>=0&&min_time_diff_current<=1.0)
+		{	
+			m_radio_fingerprints_extended[it_current_fingerprint->first].gt_found=1;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].x=m_robot_ground_truth[best_index_current].x;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].y=m_robot_ground_truth[best_index_current].y;
+			m_radio_fingerprints_extended[it_current_fingerprint->first].z=m_robot_ground_truth[best_index_current].z;			
+
+		}
+		else
+		{
+			m_radio_fingerprints_extended[it_current_fingerprint->first].gt_found=-1;
+
+		}
+
+
+	}
+
+
+
+
+
+	double total_mac_address=0;
+	double mean_mac_address=0;
+	double total_count=0;
+	for(it_current_fingerprint = m_radio_fingerprints.begin(); it_current_fingerprint != m_radio_fingerprints.end(); it_current_fingerprint++)
+	{
+		total_mac_address=total_mac_address+it_current_fingerprint->second.wifi_scan.size();
+		total_count=total_count+1;
+	}
+
+	mean_mac_address=total_mac_address/total_count;
+
+
+
+	double total_mac_address_extended=0;
+	double mean_mac_address_extended=0;
+	double total_count_extended=0;
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+	{
+		total_mac_address_extended=total_mac_address_extended+it_current_fingerprint->second.wifi_scan.size();
+		total_count_extended=total_count_extended+1;
+	}
+
+	mean_mac_address_extended=total_mac_address_extended/total_count_extended;
+
+
+	std::cout<<"mean mac:"<<mean_mac_address<<",mean_mac_address_extended:"<<mean_mac_address_extended<<std::endl;
+	//return 1;
+
+	std::cout<<"Modeling.."<<std::endl;
+
+	std::cout<<"mac count:"<<m_mac_counter.size()<<" lte "<<m_lte_counter.size()<<std::endl;
+	std::cout<<"odom record count:"<<m_record_count<<std::endl;
+
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+		for(it_ref_fingerprint = m_radio_fingerprints_extended.begin();it_ref_fingerprint != m_radio_fingerprints_extended.end(); ++it_ref_fingerprint)
+		{			
+			if(it_current_fingerprint->first!=it_ref_fingerprint->first)
+			{
+				double acc_dist_current=it_current_fingerprint->second.accumulated_dist;
+				double acc_dist_ref=it_ref_fingerprint->second.accumulated_dist;
+
+				double dist_threshold=200;//100
+
+				if(acc_dist_current>0&&acc_dist_ref>0&&fabs(acc_dist_current-acc_dist_ref)<dist_threshold)
+				{
+					double previous_x=it_current_fingerprint->second.odom_x;
+					double previous_y=it_current_fingerprint->second.odom_y;
+					double previous_z=it_current_fingerprint->second.odom_z;
+
+					double x=it_ref_fingerprint->second.odom_x;
+					double y=it_ref_fingerprint->second.odom_y;
+					double z=it_ref_fingerprint->second.odom_z;
+
+					double delta_x=x-previous_x;
+					double delta_y=y-previous_y;
+					double delta_z=z-previous_z;
+					double position_diff=sqrt(delta_x*delta_x+delta_y*delta_y+delta_z*delta_z);
+
+					double sim_wifi;
+
+					sim_wifi=getCosineSimilarity(it_current_fingerprint->second.wifi_scan,it_ref_fingerprint->second.wifi_scan);
+
+					SimilartyDistance sim_dis_wifi;
+					sim_dis_wifi.similarity=sim_wifi;
+					sim_dis_wifi.distance=position_diff;
+					sim_dis_wifi.delta_x=delta_x;
+					sim_dis_wifi.delta_y=delta_y;
+					sim_dis_wifi.delta_z=delta_z;
+
+
+
+					if(sim_wifi>0)
+					{
+						//std::cout<<sim<<" "<<position_diff<<" "<<x<<" "<<y<<" "<<z<<" "<<previous_x<<" "<<previous_y<<" "<<previous_z<<std::endl;
+						//std::cout<<sim_wifi<<" "<<position_diff<<std::endl;
+						m_similarty_distance_samples.push_back(sim_dis_wifi);
+
+
+					}
+
+
+
+				}
+
+
+			}
+		}
+
+	double binning_resolution=0.05;
+	double half_binning_resolution=binning_resolution*0.5;
+	double look_up_table=0.01;
+
+
+	std::cout<<"binning..."<<std::endl;
+	//for wifi binning
+	for(double b=1;b>=0.0;b=b-look_up_table)
+	{
+
+		std::vector < double > v_distance;
+
+		for(int i=0;i<m_similarty_distance_samples.size();i++)
+		{
+			double min_sim=b-half_binning_resolution;
+			double max_sim=b+half_binning_resolution;
+
+			if(b>=1-half_binning_resolution)
+			{
+				min_sim=1-binning_resolution;
+			}
+
+			if(b<=half_binning_resolution)
+			{
+				max_sim=binning_resolution;
+			}
+
+
+			if(m_similarty_distance_samples[i].similarity>=min_sim&&m_similarty_distance_samples[i].similarity<=max_sim)
+			{
+				v_distance.push_back(m_similarty_distance_samples[i].distance);
+			}
+
+		}
+		double mean_distance=0;
+		double variance=0;
+
+		for(int i=0;i<v_distance.size();i++)
+		{
+			mean_distance=mean_distance+v_distance[i];
+		}
+
+		if(v_distance.size()>0)
+		{
+
+
+			mean_distance=mean_distance/((double)(v_distance.size()));
+
+
+
+			for(int i=0;i<v_distance.size();i++)
+			{
+				variance=variance+(v_distance[i]-mean_distance)*(v_distance[i]-mean_distance);
+			}
+			variance=variance/((double)(v_distance.size()));
+
+			SimilartyVariance similarty_variance;
+			similarty_variance.similarity=b;
+			similarty_variance.variance=variance;
+			similarty_variance.mean=mean_distance;
+
+			m_similarty_model.push_back(similarty_variance);
+
+			//std::cout<<"wifi:"<<b<<" "<<similarty_variance.variance<<" "<<sqrt(similarty_variance.variance)<<" "<<v_distance.size()<<" "<<mean_distance<<std::endl;
+
+			std::cout<<b<<" "<<mean_distance<<" "<<sqrt(similarty_variance.variance)<<" "<<v_distance.size()<<std::endl;
+
+		}
+
+	}
+
+	//return 1;
+
+	std::map<string, int>::iterator it_mac_address;
+
+	std::map<string, int> mac_count;//mac address to the number of detections
+
+	std::map<string, int> mac_node_id;//mac address -> node id in the graph
+
+
+	std::map<int, string> node_id_mac;//node id in the graph->mac address
+
+	for(it_current_fingerprint = m_radio_fingerprints.begin(); it_current_fingerprint != m_radio_fingerprints.end(); it_current_fingerprint++)
+	{
+
+		std::map<string, int> rss_measure=it_current_fingerprint->second.wifi_scan;//rss measure
+		for(it_mac_address = rss_measure.begin(); it_mac_address != rss_measure.end(); it_mac_address++)
+		{
+			mac_count[it_mac_address->first]=mac_count[it_mac_address->first]+1;
+		}
+
+
+	}
+
+	m_odom_record=m_record_count;
+	for(it_mac_address = mac_count.begin(); it_mac_address != mac_count.end(); it_mac_address++)
+	{
+		mac_node_id[it_mac_address->first]=m_record_count;
+		m_record_count=m_record_count+1;
+	}
+
+	for(it_mac_address = mac_node_id.begin(); it_mac_address != mac_node_id.end(); it_mac_address++)
+	{
+		node_id_mac[it_mac_address->second]=it_mac_address->first;		
+	}
+
+
+	plot_similarity_model(m_similarty_model);
+
+
+	// Set up the optimiser
+	SparseOptimizer optimizer;
+	optimizer.setVerbose(true);
+
+	// Create the block solver - the dimensions are specified because
+	// 3D observations marginalise to a 3D estimate
+	typedef BlockSolver<BlockSolverX > SlamBlockSolver;
+	OptimizationAlgorithmLevenberg* solver = new OptimizationAlgorithmLevenberg(
+			g2o::make_unique<SlamBlockSolver>(
+					g2o::make_unique<LinearSolverCSparse<SlamBlockSolver::PoseMatrixType>>()));
+
+	optimizer.setAlgorithm(solver);
+
+
+
+	// add the parameter representing the sensor offset
+	ParameterSE3Offset* sensorOffset = new ParameterSE3Offset;
+	sensorOffset->setId(0);
+	optimizer.addParameter(sensorOffset);
+
+
+
+
+	/*
+	//the graph-based slam solver
+	SparseOptimizer optimizer;
+	//Levenberg,block solver
+	typedef BlockSolver< BlockSolverX >  SlamBlockSolver;
+	typedef LinearSolverCSparse<SlamBlockSolver::PoseMatrixType> SlamLinearSolver;
+	// allocating the optimizer
+	SlamLinearSolver* linearSolver = new SlamLinearSolver();
+	linearSolver->setBlockOrdering(false);
+	SlamBlockSolver* blockSolver = new SlamBlockSolver(linearSolver);
+	OptimizationAlgorithmLevenberg* solver = new OptimizationAlgorithmLevenberg(blockSolver);
+	optimizer.setAlgorithm(solver);
+
+	// add the parameter representing the sensor offset
+	ParameterSE3Offset* sensorOffset = new ParameterSE3Offset;
+	Isometry3D sensorOffsetTransf=Isometry3D::Identity();
+	sensorOffset->setOffset(sensorOffsetTransf);
+	sensorOffset->setId(0);
+	optimizer.addParameter(sensorOffset);
+	 */
+
+
+
+
+	//add the nodes in the graph
+	for(it_current_odom = m_robot_odometry.begin(); it_current_odom != m_robot_odometry.end(); it_current_odom++)
+	{
+		double x=it_current_odom->second.x;
+		double y=it_current_odom->second.y;
+		double z=it_current_odom->second.z;
+
+		double qx=it_current_odom->second.qx;
+		double qy=it_current_odom->second.qy;
+		double qz=it_current_odom->second.qz;
+		double qw=it_current_odom->second.qw;
+
+		Eigen::Vector3d trans(x,y,z);
+		Eigen::Quaterniond q(qw,qx,qy,qz);//w,x,y,z
+		g2o::SE3Quat current(q,trans);
+
+		VertexSE3* robot =  new VertexSE3;
+		robot->setId(it_current_odom->first);
+
+		robot->setEstimate(current);
+		optimizer.addVertex(robot);
+	}
+
+
+
+	//we add the odometry-based constraints
+	for(it_current_odom = m_robot_odometry.begin(); it_current_odom != m_robot_odometry.end(); it_current_odom++)
+	{
+
+		int previous_id=it_current_odom->first-1;
+
+		std::map< int, RobotOdom >::iterator it_previous_odom;
+
+		it_previous_odom=m_robot_odometry.find(previous_id);
+
+		if(it_previous_odom!=m_robot_odometry.end())
+		{		
+			EdgeSE3* odometry = new EdgeSE3;
+			odometry->vertices()[0] = optimizer.vertex(it_previous_odom->first);
+			odometry->vertices()[1] = optimizer.vertex(it_current_odom->first);
+
+
+			double previous_x=it_previous_odom->second.x;
+			double previous_y=it_previous_odom->second.y;
+			double previous_z=it_previous_odom->second.z;
+			double previous_qx=it_previous_odom->second.qx;
+			double previous_qy=it_previous_odom->second.qy;
+			double previous_qz=it_previous_odom->second.qz;
+			double previous_qw=it_previous_odom->second.qw;
+
+			double x=it_current_odom->second.x;
+			double y=it_current_odom->second.y;
+			double z=it_current_odom->second.z;
+
+			double qx=it_current_odom->second.qx;
+			double qy=it_current_odom->second.qy;
+			double qz=it_current_odom->second.qz;
+			double qw=it_current_odom->second.qw;
+
+			Eigen::Vector3d previous_trans(previous_x,previous_y,previous_z);
+			Eigen::Quaterniond previous_q(previous_qw,previous_qx,previous_qy,previous_qz);//w,x,y,z
+
+			Eigen::Vector3d trans(x,y,z);
+			Eigen::Quaterniond q(qw,qx,qy,qz);//w,x,y,z
+
+			g2o::SE3Quat previous(previous_q,previous_trans);
+			g2o::SE3Quat current(q,trans);
+
+			g2o::SE3Quat relative_odom=previous.inverse()*current;//relative transformtion T=inverse(A)*B,
+			Eigen::Quaterniond qd_relative_odom= relative_odom.rotation();
+			Eigen::Quaternion<float> q_relative_odom=relative_odom.rotation().cast<float>();
+			Eigen::Vector3d t_relative_odom=relative_odom.translation();
+			Eigen::Matrix3f matrix_relative_odom=q_relative_odom.toRotationMatrix();
+			Eigen::Affine3f affine_relative_odom(matrix_relative_odom);
+
+
+			double temp_q[4];
+			double temp_euler[3];
+			double temp_mat[9];
+			temp_q[0]=q_relative_odom.x();
+			temp_q[1]=q_relative_odom.y();
+			temp_q[2]=q_relative_odom.z();
+			temp_q[3]=q_relative_odom.w();
+			QuatToMatrix3(temp_q,temp_mat);
+			Matrix3ToEuler(temp_mat,temp_euler);
+
+			//std::cout<<x<<" "<<y<<" "<<z<<std::endl;
+			//std::cout<<"tx ty tz:"<<t_relative_odom.x()<<" "<<t_relative_odom.y()<<" "<<t_relative_odom.z()<<std::endl;
+			//std::cout<<"euler angles:"<<temp_euler[0]<<" "<<temp_euler[1]<<" "<<temp_euler[2]<<std::endl;
+
+
+			//default noise of odometry
+			double tran_noise=0.05;
+			double rotation_noise=0.2*M_PI/180.0;
+
+			Eigen::Matrix<double,6,6> covariance;
+			covariance.fill(0);
+
+			covariance(0,0)=carmen_square(fabs(t_relative_odom(0)*tran_noise)+0.0001);
+			covariance(1,1)=carmen_square(fabs(t_relative_odom(1)*tran_noise)+0.0001);
+			covariance(2,2)=carmen_square(fabs(t_relative_odom(2)*tran_noise)+0.0001);
+
+			covariance(3,3)=carmen_square(fabs(temp_euler[0]*rotation_noise)+0.0001*M_PI/180.0);
+			covariance(4,4)=carmen_square(fabs(temp_euler[1]*rotation_noise)+0.0001*M_PI/180.0);
+			covariance(5,5)=carmen_square(fabs(temp_euler[2]*rotation_noise)+0.0001*M_PI/180.0);
+
+			Eigen::Matrix<double,6,6> information=covariance.inverse();
+
+			odometry->setMeasurement(relative_odom);
+			odometry->setInformation(information);
+			optimizer.addEdge(odometry);
+
+		}
+
+	}
+
+	int num_constrain=0;
+	int combined_constrains=0;
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+		for(it_ref_fingerprint = m_radio_fingerprints_extended.begin();it_ref_fingerprint != m_radio_fingerprints_extended.end(); ++it_ref_fingerprint)
+		{
+			//we check the similarity between this two fingerprints
+
+			if(it_current_fingerprint->first==it_ref_fingerprint->first)
+				continue;
+
+
+			double acc_current_dist=it_current_fingerprint->second.accumulated_dist;
+
+			double acc_ref_dist=it_ref_fingerprint->second.accumulated_dist;
+
+			double distance_diff=fabs(acc_ref_dist-acc_current_dist);
+
+
+			int robot_id_current=it_current_fingerprint->second.index_robot;
+			int robot_id_ref=it_ref_fingerprint->second.index_robot;
+
+			double likelihood = carmen_uniform_random(0,1);
+
+
+			double previous_x=it_ref_fingerprint->second.odom_x;
+			double previous_y=it_ref_fingerprint->second.odom_y;
+			double previous_z=it_ref_fingerprint->second.odom_z;
+
+			double x=it_current_fingerprint->second.odom_x;
+			double y=it_current_fingerprint->second.odom_y;
+			double z=it_current_fingerprint->second.odom_z;
+			double delta_x=x-previous_x;
+			double delta_y=y-previous_y;
+			double delta_z=z-previous_z;
+			double position_diff=sqrt(delta_x*delta_x+delta_y*delta_y+delta_z*delta_z);
+
+
+			if(robot_id_current>=0&&robot_id_ref>=0&&robot_id_current>robot_id_ref&&distance_diff>=100&&likelihood<1.2)
+			{
+
+				double sim_lte=getCosineSimilarity(it_current_fingerprint->second.cell_scan,it_ref_fingerprint->second.cell_scan);
+
+				double sim_wifi=0;
+
+				sim_wifi=getCosineSimilarity(it_current_fingerprint->second.wifi_scan,it_ref_fingerprint->second.wifi_scan);
+				//sim_wifi=getGaussianSimilarity(it_current_fingerprint->second.wifi_scan,it_ref_fingerprint->second.wifi_scan);
+
+				double wifi_sim_thresh=0.6;
+
+				double wifi_mean;
+				double wifi_variance;
+
+				//get the wifi mean and variance
+				if(sim_wifi>=wifi_sim_thresh)
+				{
+					//find the uncertainty based on the previously learned model
+					int similarity_table_index=0;
+					double min_sim_diff=INFINITY;
+					for(int s=0;s<m_similarty_model.size();s++)
+					{
+
+						if(fabs(sim_wifi-m_similarty_model[s].similarity)<min_sim_diff)
+						{
+							min_sim_diff=fabs(sim_wifi-m_similarty_model[s].similarity);
+							similarity_table_index=s;
+						}
+					}
+					wifi_mean=m_similarty_model[similarity_table_index].mean;
+					wifi_variance=m_similarty_model[similarity_table_index].variance;
+
+
+					double inv_variance=1.0/wifi_variance;
+
+					EdgeSE3Distance* observation = new EdgeSE3Distance;
+					observation->setMeasurement(wifi_mean);
+
+					observation->vertices()[0] = optimizer.vertex(robot_id_current);
+					observation->vertices()[1] = optimizer.vertex(robot_id_ref);
+					observation->setParameterId(0, 0);
+
+					//set the information matrix
+					Eigen::Matrix<double,1,1> information_matrix=inv_variance*Eigen::Matrix<double,1,1>::Identity();
+					observation->setInformation(information_matrix);
+
+					optimizer.addEdge(observation);
+					num_constrain=num_constrain+1;
+					//std::cout<<num_constrain<<",from:"<<robot_id_current<<",to:"<<robot_id_ref<<" "<<position_diff<<std::endl;
+
+
+
+				}
+
+
+
+
+
+			}
+
+
+		}
+
+
+
+
+
+	// prepare and run the optimization
+	// fix the first robot pose to account for gauge freedom
+	std::cout << "Setting first robot pose.." << std::endl;
+	VertexSE3* firstRobotPose = dynamic_cast<VertexSE3*>(optimizer.vertex(0));
+	firstRobotPose->setFixed(true);
+	firstRobotPose->setMarginalized(true);
+	optimizer.setVerbose(true);
+
+	//save the raw pose before optimization
+	OptimizableGraph::VertexIDMap graph_vertices=optimizer.vertices();
+	OptimizableGraph::VertexIDMap::iterator it_map;
+	for(it_map = graph_vertices.begin(); it_map != graph_vertices.end(); ++it_map)
+	{
+
+		if(it_map->first<m_odom_record)
+		{
+			//it is a odom node
+			VertexSE3* vertex = dynamic_cast<VertexSE3*>(it_map->second);
+			g2o::SE3Quat pose_se3quat=vertex->estimateAsSE3Quat();
+			m_raw_se3quat_pose[it_map->first]=pose_se3quat;
+		}	
+	}
+
+
+	std::map <std::string, int >::iterator it_mac;
+
+	for(it_mac = m_mac_counter.begin(); it_mac != m_mac_counter.end(); ++it_mac)
+	{
+
+		//std::cout<<it_mac->first<<" "<<it_mac->second<<std::endl;
+	}
+
+
+
+	std::cout << "Optimizing" << std::endl;
+	optimizer.initializeOptimization();
+	optimizer.optimize(40);
+	std::cout << "done." << std::endl;
+
+	std::vector<std::pair <int, int> > blockIndices;
+
+	std::vector< int > nodeIDs;
+
+
+	//save the optimized poses
+	graph_vertices=optimizer.vertices();
+	for(it_map = graph_vertices.begin(); it_map != graph_vertices.end(); ++it_map)
+	{
+
+		if(it_map->first<m_odom_record){
+			VertexSE3* vertex = dynamic_cast<VertexSE3*>(it_map->second);
+			g2o::SE3Quat pose_se3quat=vertex->estimateAsSE3Quat();
+			m_optimized_se3quat_pose[it_map->first]=pose_se3quat;
+
+			RobotOdom optimized_odom;
+			optimized_odom.x=pose_se3quat.translation()[0];
+			optimized_odom.y=pose_se3quat.translation()[1];
+			optimized_odom.z=pose_se3quat.translation()[2];
+			optimized_odom.timestamp=m_robot_odometry[it_map->first].timestamp;
+
+			m_robot_odometry_optimized[it_map->first]=optimized_odom;
+
+		}
+		else
+		{
+
+		}
+	}
+
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+	{
+
+		int index_robot=it_current_fingerprint->second.index_robot;
+
+		//we check the every location in the reference recording and record the estimated pose
+		std::map< int, RobotOdom >::iterator it_odom;
+
+		it_odom = m_robot_odometry_optimized.find(index_robot);
+
+		if(it_odom!=m_robot_odometry_optimized.end())
+		{
+			//we find this odom and record the optimized pose
+
+			m_radio_fingerprints_optimized[it_current_fingerprint->first].x=it_odom->second.x;
+			m_radio_fingerprints_optimized[it_current_fingerprint->first].y=it_odom->second.y;
+			m_radio_fingerprints_optimized[it_current_fingerprint->first].z=it_odom->second.z;
+
+		}
+
+	}
+
+
+	double sum_gt_x=0;
+	double sum_gt_y=0;
+	double mean_gt_x=0;
+	double mean_gt_y=0;
+	double sum_gt_count=0;
+
+	double first_gt_x=0;
+	double first_gt_y=0;
+
+	double first_optimized_x=0;
+	double first_optimized_y=0;
+
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); it_current_fingerprint++)
+	{
+if(it_current_fingerprint->second.gt_found>0)
+{
+
+		sum_gt_x=sum_gt_x+it_current_fingerprint->second.x;
+		sum_gt_y=sum_gt_y+it_current_fingerprint->second.y;
+		sum_gt_count=sum_gt_count+1.0;
+}
+	}
+
+
+	mean_gt_x=sum_gt_x/sum_gt_count;
+	mean_gt_y=sum_gt_y/sum_gt_count;
+
+	double sum_optimized_x=0;
+	double sum_optimized_y=0;
+	double mean_optimized_x=0;
+	double mean_optimized_y=0;
+	double sum_optimized_count=0;
+
+	for(it_current_fingerprint = m_radio_fingerprints_optimized.begin(); it_current_fingerprint != m_radio_fingerprints_optimized.end(); it_current_fingerprint++)
+	{
+		sum_optimized_x=sum_optimized_x+it_current_fingerprint->second.x;
+		sum_optimized_y=sum_optimized_y+it_current_fingerprint->second.y;
+		sum_optimized_count=sum_optimized_count+1.0;
+	}
+
+
+	mean_optimized_x=sum_optimized_x/sum_optimized_count;
+	mean_optimized_y=sum_optimized_y/sum_optimized_count;
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); ++it_current_fingerprint)
+	{
+		//we find the ground truth
+
+		it_ref_fingerprint=m_radio_fingerprints_optimized.find(it_current_fingerprint->first);
+
+		if(it_ref_fingerprint!=m_radio_fingerprints_optimized.end()&&it_current_fingerprint->second.gt_found>0)
+		{
+			first_gt_x=it_current_fingerprint->second.x;
+			first_gt_y=it_current_fingerprint->second.y;
+
+
+			first_optimized_x=it_ref_fingerprint->second.x;
+
+			first_optimized_y=it_ref_fingerprint->second.y;
+
+
+
+		}
+	}
+
+
+	
+	double x_offset=first_gt_x-first_optimized_x;
+	double y_offset=first_gt_y-first_optimized_y;
+
+
+
+	std::cout<<"gt x:"<<mean_gt_x<<", gt y:"<<mean_gt_y<<std::endl;
+
+	std::cout<<"optimized x:"<<mean_optimized_x<<", optimized y:"<<mean_optimized_y<<std::endl;
+
+
+	std::cout<<"first gt x:"<<first_gt_x<<", first gt y:"<<first_gt_y<<std::endl;
+
+	std::cout<<"first optimized x:"<<first_optimized_x<<", first optimized y:"<<first_optimized_y<<std::endl;
+
+
+
+
+
+	double min_error=INFINITY;
+	double variance;
+
+	double best_d_rotation;
+	double best_d_x_offset;
+	double best_d_y_offset;
+
+	//then we need to find a coarse offset and rotation
+	for(double d_rotation=-3;d_rotation<=3;d_rotation=d_rotation+0.2)
+		for(double d_x_offset=-100;d_x_offset<=100;d_x_offset=d_x_offset+5)
+			for(double d_y_offset=-100;d_y_offset<=100;d_y_offset=d_y_offset+5)
+			{
+				std::vector < double > v_error;//analysis of error
+
+
+				for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); ++it_current_fingerprint)
+				{
+					//we find the ground truth
+
+					it_ref_fingerprint=m_radio_fingerprints_optimized.find(it_current_fingerprint->first);
+
+
+					if(it_ref_fingerprint!=m_radio_fingerprints_optimized.end()&&it_current_fingerprint->second.gt_found>0)
+					{
+						carmen_point_t gt;
+						gt.x=it_current_fingerprint->second.x;
+						gt.y=it_current_fingerprint->second.y;
+
+						carmen_point_t position;
+						position.x=it_ref_fingerprint->second.x;
+						position.y=it_ref_fingerprint->second.y;
+
+						double e_x=position.x*cos(d_rotation)-position.y*sin(d_rotation)+d_x_offset+x_offset;
+						double e_y=position.x*sin(d_rotation)+position.y*cos(d_rotation)+d_y_offset+y_offset;
+
+						double error=sqrt( (gt.x-e_x)*(gt.x-e_x) + (gt.y-e_y)*(gt.y-e_y));
+						v_error.push_back(error);
+
+					}
+
+
+				}
+
+				//caculate the mean and standard deviation of mean
+				double sum_error=0;
+				double sum_deviation=0;
+				double average_error=0;
+				double deviation_error=0;
+
+				for(int i=0;i<v_error.size();i++)
+				{
+					sum_error=sum_error+v_error[i];
+				}
+
+				average_error=sum_error/( (double)(v_error.size()) );
+
+
+				for(int i=0;i<v_error.size();i++)
+				{
+					sum_deviation=sum_deviation+(v_error[i]-average_error)*(v_error[i]-average_error);
+				}
+
+				deviation_error=sqrt( sum_deviation/( (double)(v_error.size()) ) );
+
+				//std::cout<<"rotation:"<<d_rotation<<",x_offset:"<<d_x_offset<<",y_offset:"<<d_y_offset<<",mean:"<<average_error<<",deviation:"<<deviation_error<<std::endl;
+
+				if(average_error<min_error)
+				{
+					min_error=average_error;
+					variance=deviation_error;
+
+
+					best_d_rotation=d_rotation;
+					best_d_x_offset=d_x_offset;
+					best_d_y_offset=d_y_offset;
+
+				}
+
+			}
+
+	//then we need to find a precise offset and rotation based on the coarse estimation
+	for(double d_rotation=best_d_rotation-1.0;d_rotation<=best_d_rotation+1.0;d_rotation=d_rotation+0.05)
+		for(double d_x_offset=best_d_x_offset-40;d_x_offset<=best_d_x_offset+40;d_x_offset=d_x_offset+0.5)
+			for(double d_y_offset=best_d_y_offset-40;d_y_offset<=best_d_y_offset+40;d_y_offset=d_y_offset+0.5)
+			{
+				std::vector < double > v_error;//analysis of error
+
+
+				for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); ++it_current_fingerprint)
+				{
+					//we find the ground truth
+
+					it_ref_fingerprint=m_radio_fingerprints_optimized.find(it_current_fingerprint->first);
+
+
+					if(it_ref_fingerprint!=m_radio_fingerprints_optimized.end()&&it_current_fingerprint->second.gt_found>0)
+					{
+						carmen_point_t gt;
+						gt.x=it_current_fingerprint->second.x;
+						gt.y=it_current_fingerprint->second.y;
+
+						carmen_point_t position;
+						position.x=it_ref_fingerprint->second.x;
+						position.y=it_ref_fingerprint->second.y;
+
+						double e_x=position.x*cos(d_rotation)-position.y*sin(d_rotation)+d_x_offset+x_offset;
+						double e_y=position.x*sin(d_rotation)+position.y*cos(d_rotation)+d_y_offset+y_offset;
+
+						double error=sqrt( (gt.x-e_x)*(gt.x-e_x) + (gt.y-e_y)*(gt.y-e_y));
+						v_error.push_back(error);
+
+					}
+
+
+				}
+
+				//caculate the mean and standard deviation of mean
+				double sum_error=0;
+				double sum_deviation=0;
+				double average_error=0;
+				double deviation_error=0;
+
+				for(int i=0;i<v_error.size();i++)
+				{
+					sum_error=sum_error+v_error[i];
+				}
+
+				average_error=sum_error/( (double)(v_error.size()) );
+
+
+				for(int i=0;i<v_error.size();i++)
+				{
+					sum_deviation=sum_deviation+(v_error[i]-average_error)*(v_error[i]-average_error);
+				}
+
+				deviation_error=sqrt( sum_deviation/( (double)(v_error.size()) ) );
+
+				//std::cout<<"rotation:"<<d_rotation<<",x_offset:"<<d_x_offset<<",y_offset:"<<d_y_offset<<",mean:"<<average_error<<",deviation:"<<deviation_error<<std::endl;
+
+				if(average_error<min_error)
+				{
+					min_error=average_error;
+					variance=deviation_error;
+
+
+					best_d_rotation=d_rotation;
+					best_d_x_offset=d_x_offset;
+					best_d_y_offset=d_y_offset;
+
+				}
+
+			}
+
+
+
+	std::vector < carmen_point_t > v_ground_truth;
+
+	std::vector < carmen_point_t > v_optimized;
+
+
+	for(it_current_fingerprint = m_radio_fingerprints_extended.begin(); it_current_fingerprint != m_radio_fingerprints_extended.end(); ++it_current_fingerprint)
+	{
+		//we find the ground truth
+
+		it_ref_fingerprint=m_radio_fingerprints_optimized.find(it_current_fingerprint->first);
+
+
+		if(it_ref_fingerprint!=m_radio_fingerprints_optimized.end()&&it_current_fingerprint->second.gt_found>0)
+		{
+			carmen_point_t gt;
+			gt.x=it_current_fingerprint->second.x;
+			gt.y=it_current_fingerprint->second.y;
+
+			carmen_point_t position;
+			position.x=it_ref_fingerprint->second.x;
+			position.y=it_ref_fingerprint->second.y;
+
+			carmen_point_t position_transform;
+
+
+			double e_x=position.x*cos(best_d_rotation)-position.y*sin(best_d_rotation)+best_d_x_offset+x_offset;
+			double e_y=position.x*sin(best_d_rotation)+position.y*cos(best_d_rotation)+best_d_y_offset+y_offset;
+
+			position_transform.x=e_x;
+			position_transform.y=e_y;
+			v_ground_truth.push_back(gt);
+
+			v_optimized.push_back(position_transform);
+
+
+		}
+
+
+	}
+
+
+
+	plot_track_alignment(v_ground_truth,v_optimized);
+
+	//close the database
+	std::cout<<"num_constrain:"<<num_constrain<<",mean error:"<<min_error<<",variance:"<<variance<<std::endl;
+	std::cout<<"x offset:"<<best_d_x_offset<<",y offset:"<<best_d_y_offset<<",angle offset:"<<best_d_rotation<<std::endl;
+
+
+
+
+	//hold for plot
+	sleep(500000000000000000);//20 ms
+
+
+
+	exit(0);
+
+}

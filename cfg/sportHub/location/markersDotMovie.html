@@ -1,0 +1,180 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sport Hub Portal</title>
+<meta name="description" content="Launching Next showcases the world's most promising new startups every day."/>
+<meta name="keywords" content="startups, new startups, startup ideas, great business ideas, tech startups, mobile startups, green startups, web startups"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+
+<script src="../lib/js/jquery-1.11.3.min.js"></script>
+<script src="../lib/js/bootstrap.min.js"></script>
+<script src="../lib/js/custom.js"></script>
+<script src="../lib/js/bootstrap-datetimepicker.min.js"></script>
+<link rel="stylesheet" href="../lib/css/bootstrap.min.css" media="screen">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="../lib/css/custom.css">
+<link rel="stylesheet" href="../lib/css/nav.css">
+<link rel="stylesheet" href="../lib/css/bootstrap-datetimepicker.css">
+<link rel="stylesheet" href="../lib/css/font-awesome.min.css">
+<style>
+          #map {            
+            height: 600px;
+          }
+        </style>
+</head>
+<body id="home">
+<div class="navbar navbar-default navbar-fixed-top navbar-transparent">
+<div class="container">
+<div class="navbar-header">
+<!--<a href="/" class="navbar-brand"><img class="logo" src="../images/PSAI_Logo.png" alt="" /></a>-->
+<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#navbar-main">
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+</button>
+</div>
+<div class="navbar-collapse collapse" id="navbar-main">
+
+<!--
+<ul class="nav navbar-nav navbar-right">
+<li><a href="./geofences.html"><i class="icon-map-marker"></i> &nbsp;Check location</a></li>
+<li><a href="./markers.html"><i class="icon-map-marker"></i> &nbsp;Current location</a></li>
+<li><a href="./animations.html"><i class="icon-globe"></i> &nbsp;Historical location</a></li>
+<li><a href="./dataMonitor.html"><i class="icon-desktop"></i> &nbsp;Data Monitoring</a></li>
+<li><a href="./beacon.html"><i class="icon-signal"></i> &nbsp;Beacon</a></li>
+<li><a href="/"><i class="icon-signin"></i> &nbsp;Sign in</a></li>
+<li><a href="/"><i class="icon-signout"></i> &nbsp;Sign out</a></li>
+</ul>
+-->
+</div>
+</div>
+</div>
+<div class="splash" style="margin-top:-30px">
+<div class="container">
+
+<div>
+<label for="mce-EMAIL" style="padding-bottom:4px; font-size:30px">Locations of user in last five minutes</label>
+</div>
+
+</div>
+</div>
+
+<div class="section-preview">
+<div class="container">
+<div class="row" style="margin-bottom:20px;margin-left:0px;"><p><span class="group_day"><i class="icon-map-marker" style="color:#f39c12;"></i> Dock</span> <span class="group_date">Map</span>
+
+
+</p></div>
+</div>
+<div class="container" id="map"></div>
+</div>
+
+
+<script>
+    var markers = [];
+    var markersOld = [];
+    var map;
+    var line;
+    var paths = new Array();
+
+    var resLocation = [];
+
+    function initMap() { 
+        //alert(res.length);      
+      
+        map = new google.maps.Map(document.getElementById('map'), {
+            zoom: 18,
+            center: {lat: 1.304318, lng: 103.874345}
+        });
+        $.getJSON("../markers/getHistoricalData.php?", function(res){ 
+            paths = [];      
+            //line.setMap(null);        
+            for (var i = 0; i < res.length; i++) {
+                var lng = {lat: parseFloat(res[i].latitude), lng: parseFloat(res[i].longitude)};
+                if (res[i].user_id == "356319062089796") {
+                    addMarkerWithTimeout(lng,5000+ i * 100,'#393');
+                } else {
+                    addMarkerWithTimeout(lng,5000+ i * 100, '#e82a5d');
+                }
+            }
+        }); 
+    }
+
+function addMarkerWithTimeout(position, timeout, color) {
+  window.setTimeout(function() {
+    var date = new Date();
+console.log("time",date.getTime().toString());
+    markers.push(new google.maps.Marker({
+                    position: position,
+                    icon: {
+                      path: google.maps.SymbolPath.CIRCLE,
+                    strokeColor: color,
+                    strokeOpacity: 0.8,
+                    strokeWeight: 5,
+                      scale: 3
+                    },
+
+                    map: map
+
+    }));
+  }, timeout);
+}
+
+  
+
+    function addMarkerMessage(location, message, map, icon) {
+        var marker = new google.maps.Marker({
+            position: location,
+            map: map,
+            animation: google.maps.Animation.DROP,
+            icon: icon
+        });
+        markers.push(marker);
+        marker.setAnimation(null);
+        attachMessage(marker, message);
+    }
+
+    function attachMessage(marker, message) {
+      var infowindow = new google.maps.InfoWindow({
+        content: message
+      });
+
+      marker.addListener('click', function() {
+        infowindow.open(marker.get('map'), marker);
+      });
+    }
+
+
+</script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAXizYVi-zbXV0A8cHw0rlHt4YmqCpZDSI&callback=initMap&signed_in=true" async defer>
+    </script>
+    
+    <!-- datetimepicker js -->
+	<script type="text/javascript">
+    	$('#form_datetime-st').datetimepicker(
+    			{format:'yyyy-mm-dd hh:ii', pickerPosition:'bottom-right'});
+    	$('#form_datetime-et').datetimepicker(
+    			{format:'yyyy-mm-dd hh:ii', pickerPosition:'bottom-right'});
+    </script>
+    
+<div class="section-footer">
+<div class="container">
+<footer id="footer">
+<div class="row">
+<div class="col-lg-12">
+<ul class="list-unstyled">
+<li class="pull-right"><a href="#top">Back to top</a></li>
+
+</ul>
+</div>
+</div>
+
+</footer>
+</div>
+</div>
+
+</body>
+</html>
+

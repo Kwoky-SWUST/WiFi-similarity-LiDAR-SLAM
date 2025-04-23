@@ -1,0 +1,403 @@
+##############################################################################
+
+
+        ##  ##                                     ##    ###     ####
+        ##  ##                                          ## ##   ##  ##
+ ####   ##  ##   ####  ## ## ##    ####   ## ###  ###  ##   ## ##       #####
+##  ##  ##  ##  ##  ##  ########  ##  ##   ### ##  ##  ##   ## ##      ##   ##
+    ##  ##  ##  ######  ## ## ##      ##   ##  ##  ##  ##   ## ##       ##
+ #####  ##  ##  ##      ## ## ##   #####   ##  ##  ##  ####### ##         ###
+##  ##  ##  ##  ##  ##  ## ## ##  ##  ##   ##  ##  ##  ##   ##  ##  ## ##   ##
+ ### ##  ##  ##  ####   ## ##  ##  ### ## ###  ## #### ##   ##   ####   #####
+
+##############################################################  #####  #####
+                                                               ##   ## ##  ##
+                                                                    ## ##   ##
+                                                                  ###  ##   ##
+                                                                    ## ##   ##
+                                                               ##   ## ##  ##
+                                                                #####  #####
+
+#           $Id: Makefile.rules,v 1.13 2006/04/05 12:15:02 vorst Exp $
+# last modified: $Date: 2006/04/05 12:15:02 $
+#            by: $Author: vorst $
+
+##############################################################################
+
+
+
+# RULES
+
+APPL1_CPP  = $(APPL1_FILES:%=%.cpp)
+APPL1_OBS  = $(APPL1_FILES:%=$(OBS_DIR)/%.o)
+APPL2_CPP  = $(APPL2_FILES:%=%.cpp)
+APPL2_OBS  = $(APPL2_FILES:%=$(OBS_DIR)/%.o)
+# APPL2_CPP   = $(subst ../,__/,$(APPL2_FILES:%=%.cpp))
+# APPL2_OBS   = $(subst ../,__/,$(APPL2_FILES:%=$(OBS_PATH)/%.o))
+APPL3_CPP  = $(APPL3_FILES:%=%.cpp)
+APPL3_OBS  = $(APPL3_FILES:%=$(OBS_DIR)/%.o)
+APPL4_CPP  = $(APPL4_FILES:%=%.cpp)
+APPL4_OBS  = $(APPL4_FILES:%=$(OBS_DIR)/%.o)
+APPL5_CPP  = $(APPL5_FILES:%=%.cpp)
+APPL5_OBS  = $(APPL5_FILES:%=$(OBS_DIR)/%.o)
+APPL6_CPP  = $(APPL6_FILES:%=%.cpp)
+APPL6_OBS  = $(APPL6_FILES:%=$(OBS_DIR)/%.o)
+APPL7_CPP  = $(APPL7_FILES:%=%.cpp)
+APPL7_OBS  = $(APPL7_FILES:%=$(OBS_DIR)/%.o)
+APPL8_CPP  = $(APPL8_FILES:%=%.cpp)
+APPL8_OBS  = $(APPL8_FILES:%=$(OBS_DIR)/%.o)
+APPL9_CPP  = $(APPL9_FILES:%=%.cpp)
+APPL9_OBS  = $(APPL9_FILES:%=$(OBS_DIR)/%.o)
+APPL10_CPP  = $(APPL10_FILES:%=%.cpp)
+APPL10_OBS  = $(APPL10_FILES:%=$(OBS_DIR)/%.o)
+
+
+
+# ##### M O D U L E 1 #######################################################
+APPL1_SYS_LIB_FLAGS = $(APPL1_SYS_LIBS:%=-l%)
+
+APPL1_LIB_FLAGS = $(APPL1_LIBS:%=-l%)
+ifeq ($(USE_SHARED_LIBS),)
+APPL1_LIB_FILES = $(APPL1_LIBS:%=$(LIB_PATH)/lib%.a)
+endif
+
+APPL1_EXTRA_LIB_FLAGS = $(APPL1_EXTRA_LIBS)
+
+ifneq ($(USE_SHARED_LIBS),)
+APPL1_ALL_LIB_FLAGS = $(APPL1_EXTRA_LIB_FLAGS) \
+                      $(APPL1_SYS_LIB_FLAGS)
+else
+APPL1_ALL_LIB_FLAGS = $(APPL1_EXTRA_LIB_FLAGS) \
+                      $(APPL1_LIB_FLAGS) \
+                      $(APPL1_SYS_LIB_FLAGS)
+endif
+
+
+
+# ##### M O D U L E   2 #####################################################
+ifneq ($(APPL2_MODULE),)
+APPL2_SYS_LIB_FLAGS += $(APPL2_SYS_LIBS:%=-l%)
+APPL2_LIB_FLAGS = $(APPL2_LIBS:%=-l%)
+APPL2_LIB_FILES = $(APPL2_LIBS:%=$(LIB_PATH)/lib%.a)
+
+ifneq ($(USE_SHARED_LIBS),)
+APPL2_ALL_LIB_FLAGS = $(APPL2_EXTRA_LIB_FLAGS) \
+                      $(APPL2_SYS_LIB_FLAGS)
+else
+APPL2_ALL_LIB_FLAGS = $(APPL2_EXTRA_LIB_FLAGS) \
+                      $(APPL2_LIB_FLAGS) \
+                      $(APPL2_SYS_LIB_FLAGS)
+endif
+endif
+
+
+# #####  M O D U L E   3  ###################################################
+APPL3_SYS_LIB_FLAGS = $(APPL3_SYS_LIBS:%=-l%)
+ifeq ($(SHARED),-static)
+APPL3_LIB_FLAGS  = $(APPL3_LIBS:%=-l%)
+else
+APPL3_LIB_FLAGS += $(APPL3_LIBS:%=-llib%)
+endif
+APPL3_LIB_FILES = $(APPL3_LIBS:%=$(LIB_PATH)/lib%.a)
+
+APPL3_ALL_LIB_FLAGS = $(APPL3_LIB_FLAGS) \
+                      $(APPL3_SYS_LIB_FLAGS)
+
+
+# #####  M O D U L E   4  ###################################################
+APPL4_SYS_LIB_FLAGS = $(APPL4_SYS_LIBS:%=-l%)
+APPL4_LIB_FLAGS = $(APPL4_LIBS:%=-l%)
+APPL4_LIB_FILES = $(APPL4_LIBS:%=$(LIB_PATH)/lib%.a)
+
+APPL4_EXTRA_LIB_FLAGS = $(APPL4_EXTRA_LIBS)
+
+
+ifneq ($(USE_SHARED_LIBS),)
+APPL4_ALL_LIB_FLAGS = $(APPL4_SYS_LIB_FLAGS) \
+                      $(APPL4_EXTRA_LIB_FLAGS)
+else
+APPL4_ALL_LIB_FLAGS = $(APPL4_LIB_FLAGS) \
+                      $(APPL4_SYS_LIB_FLAGS) \
+                      $(APPL4_EXTRA_LIB_FLAGS)
+endif
+
+
+DEPENDENCIES = $(APPL1_CPP) $(APPL2_CPP) $(APPL3_CPP) $(APPL4_CPP) $(APPL5_CPP) \
+               $(APPL6_CPP) $(APPL7_CPP) $(APPL8_CPP) $(APPL9_CPP) $(APPL10_CPP) \
+               $(APPL1_REG_CPP)
+
+
+
+CFLAGS += -DMODULENAME=$(MODULENAME)
+
+# Define log level directive
+CFLAGS += -DLOG_LEVEL=$(LOG_LEVEL)
+
+
+##### Descriptions ##########################################################
+
+DESCR_COLOR  = $(BLUE)
+DESCR_INDENT = "   "
+ifneq ($(APPL1_DESCR),)
+description1:
+	$(DESCR_COLOR)
+# 	$(ECHO) $(DESCR_INDENT) " ---------------------------------------------------------"
+	$(ECHO) $(DESCR_INDENT) " Description: "$(APPL1_DESCR)
+# 	$(ECHO) $(DESCR_INDENT) " ---------------------------------------------------------"
+	$(NORMAL)
+else
+description1:
+endif
+
+ifneq ($(APPL2_DESCR),)
+description2:
+	$(DESCR_COLOR)
+# 	$(ECHO) $(DESCR_INDENT) " ---------------------------------------------------------"
+	$(ECHO) $(DESCR_INDENT) " Description: "$(APPL2_DESCR)
+# 	$(ECHO) $(DESCR_INDENT) " ---------------------------------------------------------"
+	$(NORMAL)
+else
+description2:
+endif
+
+ifneq ($(APPL4_DESCR),)
+description4:
+	$(DESCR_COLOR)
+# 	$(ECHO) $(DESCR_INDENT) " ---------------------------------------------------------"
+	$(ECHO) $(DESCR_INDENT) " Description: "$(APPL4_DESCR)
+# 	$(ECHO) $(DESCR_INDENT) " ---------------------------------------------------------"
+	$(NORMAL)
+else
+description4:
+endif
+
+
+#### General rules ##########################################################
+
+directories:
+	mkdir -p $(DIRECTORIES)
+
+rebuild: $(OBS_DIR) clean build
+
+#### dependencies ###########################################################
+
+$(DEPS_DIR)/%.d: %.cpp
+	$(SILENT) echo " --- Making Dependencies for $< (C++)"
+	$(SILENT) i="$@"; mkdir -p "$${i%/*}"
+	$(SILENT) set -e; $(CXX) -M $(CFLAGS1) $(INCLUDES) $< \
+                  | sed 's+\($(notdir $*)\)\.o[ :]*+$(OBS_DIR)/$*.o $@ : +g' > $@; \
+                [ -s $@ ] || rm -f $@
+
+ifneq ($(MAKECMDGOALS),clean)
+  ifneq ($(MAKECMDGOALS),distclean)
+    ifneq ($(strip $(DEPENDENCIES)),)
+-include $(DEPENDENCIES:%.cpp=$(DEPS_DIR)/%.d)
+    endif
+  endif
+endif
+
+
+# Files
+
+$(OBS_DIR)/%.o : %.C
+	$(SILENT) echo " --- Compiling $< (C++)"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CC) -c $(CFLAGS) $(DEBUG) $(INCLUDES) $< -o $@
+
+$(OBS_DIR)/%.o : %.cpp
+	$(SILENT) echo " --- Compiling $< (C++)"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CC) -c $(CFLAGS) $(DEBUG) $(INCLUDES) $< -o $@
+
+
+$(OBS_DIR)/%.o : %.c
+	$(SILENT) echo " --- Compiling $< (C)"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CC) -c $(CFLAGS)  $(DEBUG) $(INCLUDES) $< -o $@
+
+$(OBS_DIR)/%.o : %.cc
+	$(SILENT) echo " --- Compiling $< (C++)"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CC) -c $(CFLAGS)  $(DEBUG) $(INCLUDES) $< -o $@
+
+
+###########################################################################
+# Rules needed to process QT programs with the Meta Object Compiler (moc) #
+# and User Interface Compiler (uic) first                                 #
+###########################################################################
+
+# ifeq ($(MAKECMDGOALS),clean)
+# %.ui:
+# 	$(ECHO) Hi $*
+# 	$(SILENT) rm $*.h
+# endif
+
+%.h: %.ui
+	$(SILENT) echo " --- Creating QT UI header file for $< (C++)"
+	@ $(UIC) $< -o $@
+
+%.cpp: %.ui %.h
+	$(SILENT) echo " --- Creating QT UI implementation for $< (C++)"
+	@ $(UIC) -impl $*.h $< -o $@
+
+$(OBS_DIR)/moc%.o : moc%.cc
+	$(SILENT) echo " --- Compiling $< (C++)"
+	$(SILENT) $(CC) -c $(CFLAGS) $(DEBUG) $(INCLUDES) $< -o $@
+
+moc%.cc: %.h
+	$(SILENT) echo " --- Running moc on $<, creating $@"
+	$(SILENT) $(MOC) $(MOC_FLAGS) $< -o $@
+
+$(OBS_DIR)/moc%.o : moc%.C
+	$(SILENT) echo " --- Compiling $< (C++)"
+	$(SILENT) $(CC) -c $(CFLAGS) $(DEBUG) $(INCLUDES) $< -o $@
+
+moc%.C: %.h
+	$(SILENT) echo " --- Running moc on $<"
+	$(SILENT) $(MOC) $(MOC_FLAGS) $< -o $@
+
+$(OBS_DIR)/moc%.o : moc%.cpp
+	$(SILENT) echo " --- Compiling $< (C++)"
+	$(SILENT) $(CC) -c $(CFLAGS) $(DEBUG) $(INCLUDES) $< -o $@
+
+moc%.cpp: %.h
+	$(SILENT) echo " --- Running moc on $<"
+	$(SILENT) $(MOC) $(MOC_FLAGS) $< -o $@
+
+moc_%.cpp: %.h
+	$(SILENT) echo " --- Running moc on $<, creating $@"
+	$(SILENT) $(MOC) $(MOC_FLAGS) $< -o $@
+
+
+##### general rules
+appl1: $(BIN_PATH)/$(MODULE)
+$(BIN_PATH)/$(MODULE): $(APPL1_OBS) $(APPL1_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CXX) $(SHARED) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL1_OBS) -o $@ $(LIB_DIR) $(APPL1_ALL_LIB_FLAGS)
+##	$(SILENT) $(CXX) $(SHARED) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL1_OBS) -o $@ $(LIB_DIR) $(APPL1_ALL_LIB_FLAGS)
+
+appl2: $(BIN_PATH)/$(MODULE_2)
+ifneq ($(APPL2_MODULE),)
+$(BIN_PATH)/$(APPL2_MODULE): $(APPL2_OBS) $(APPL2_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CXX) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL2_OBS) -o $@ $(LIB_DIR) $(APPL2_ALL_LIB_FLAGS)
+endif
+
+appl3: $(BIN_PATH)/$(MODULE_3)
+ifneq ($(APPL3_MODULE),)
+$(BIN_PATH)/$(APPL3_MODULE): $(APPL3_OBS) $(APPL3_LIB_FILES) $(APPL3_MOD_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CXX) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL3_OBS) -o $@ $(LIB_DIR) $(APPL3_ALL_LIB_FLAGS)
+endif
+
+appl4: $(BIN_PATH)/$(MODULE_4)
+$(BIN_PATH)/$(MODULE_4): $(APPL4_OBS) $(APPL4_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) mkdir -p $(dir $@)
+	$(SILENT) $(CXX) $(SHARED) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL4_OBS) -o $@ $(LIB_DIR) $(APPL4_ALL_LIB_FLAGS)
+
+
+ifneq ($(USE_SHARED_LIBS),)
+so1: $(LIB_PATH)/lib$(MODULE).so
+else
+so1:
+endif
+
+$(LIB_PATH)/lib$(MODULE).so: $(APPL1_OBS) $(APPL1_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) $(CXX) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL1_OBS) -shared -o $@ $(LIB_DIR) $(APPL1_ALL_LIB_FLAGS)
+
+
+# so4: $(MODULE_4).so
+#
+# $(MODULE_4).so: $(APPL4_OBS) $(APPL4_LIB_FILES)
+# 	$(ECHO) " --> Creating $@ ---"
+# 	$(SILENT) $(CXX) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL4_OBS) -shared -o $@ $(LIB_DIR) $(APPL4_ALL_LIB_FLAGS)
+# 	$(SILENT) $(MKDIR) $(LIB_PATH)
+# 	$(SILENT) mv $@ $(LIB_PATH)
+
+
+ifneq ($(USE_SHARED_LIBS),)
+so4: $(LIB_PATH)/lib$(MODULE_4).so
+else
+so4:
+endif
+
+$(LIB_PATH)/lib$(MODULE_4).so: $(APPL4_OBS) $(APPL4_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) $(CXX) $(GPROF) $(LINKFLAGS) $(INCLUDES) $(APPL4_OBS) -shared -o $@ $(LIB_DIR) $(APPL4_ALL_LIB_FLAGS)
+
+
+lib1: lib$(MODULE).a
+
+lib$(MODULE).a: $(APPL1_OBS) $(APPL1_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) $(AR) $@ $(APPL1_OBS)
+	$(SILENT) $(RANLIB) $@
+	$(SILENT) $(MKDIR) $(LIB_PATH)
+	$(SILENT) mv $@ $(LIB_PATH)
+
+lib4: lib$(MODULE_4).a
+
+lib$(MODULE_4).a: $(APPL4_OBS) $(APPL4_LIB_FILES)
+	$(ECHO) " --> Creating $@ ---"
+	$(SILENT) $(AR) $@ $(APPL4_OBS)
+	$(SILENT) $(RANLIB) $@
+	$(SILENT) $(MKDIR) $(LIB_PATH)
+	$(SILENT) mv $@ $(LIB_PATH)
+
+
+removelibs:
+	$(SILENT) rm -f \
+                  $(MODULE:%=$(BIN_PATH)/%)       \
+                  $(MODULE:%=$(LIB_PATH)/lib%.so)    \
+                  $(MODULE:%=$(LIB_PATH)/lib%.a)  \
+                  $(MODULE).tgz                   \
+                  $(MODULE_2:%=$(BIN_PATH)/%)       \
+                  $(MODULE_2:%=$(LIB_PATH)/lib%.so)    \
+                  $(MODULE_2:%=$(LIB_PATH)/lib%.a)  \
+                  $(MODULE_3:%=$(BIN_PATH)/%)       \
+                  $(MODULE_3:%=$(LIB_PATH)/lib%.so)    \
+                  $(MODULE_3:%=$(LIB_PATH)/lib%.a)  \
+                  $(MODULE_4:%=$(BIN_PATH)/%)       \
+                  $(MODULE_4:%=$(LIB_PATH)/lib%.so)    \
+                  $(MODULE_4:%=$(LIB_PATH)/lib%.a)  \
+                  $(DISTCLEAN_FILES)
+
+distclean: clean removelibs
+
+
+clean:
+#	$(ECHO) $(APPL1_FILES:%=%.ui)
+	$(SILENT) $(RM) $(OBS_DIR) $(DEPS_DIR) *~ moc*.cpp
+
+tgz: all clean
+	$(SILENT) tar -czf $(MODULE).tgz .
+
+
+complete: all
+
+
+doc:
+	$(ECHO) " --- Searching for configuration-file ..."
+	$(SILENT)if [ -f "$(DOC_CFG)" ]; then \
+		echo " --- found $(DOC_CFG)"; \
+		echo -n " --> Generating Documentation ..."; \
+		$(DOC) $(DOC_CFG) > doxygen.log 2>&1 ; \
+		echo "     done. ---"; \
+	else \
+		echo " -!- DOC_CFG not defined ... SKIPPING!" ;\
+	fi
+
+
+status:
+	$(SILENT)cvs status | grep -e 'File\+\|?'
+
+count-lines-2:
+	$(SILENT)grep -cR ".*" *.h *.cpp
+
+count-lines:
+	find . -name "*.h" -o -name "*.cpp" -exec cat {} \; | wc -l

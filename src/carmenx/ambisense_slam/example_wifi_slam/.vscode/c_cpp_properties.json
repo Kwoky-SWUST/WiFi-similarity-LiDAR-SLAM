@@ -1,0 +1,35 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/local/include/g2o/" ,
+                "/usr/include/suitesparse/" ,
+                "/home/gglin-test/wifi_SLAM/src/" ,
+                "/home/gglin-test/wifi_SLAM/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/",
+                "/home/gglin-test/wifi_SLAM/src/exlib/g2o/",
+                "/home/gglin-test/wifi_SLAM/src/exlib/GeographicLib-1.44/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/carmen/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/gzstream/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/libdistance-0.2.2/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/newmat/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/xstream/" ,
+                "/home/gglin-test/wifi_SLAM/src/utils/" ,
+                "/home/gglin-test/wifi_SLAM/src/exlib/xstream/include/" ,
+                "/usr/include/eigen3/" ,
+                "/home/gglin-test/wifi_SLAM/src/carmenx/" ,
+                "/usr/include/mysql/" ,
+                "/usr/local/include/g2o/solvers/csparse/",
+                "/usr/local/include/"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}

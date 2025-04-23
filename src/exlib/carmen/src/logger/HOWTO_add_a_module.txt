@@ -1,0 +1,109 @@
+How to add a new module to the logger
+=====================================
+
+It's easy. You have to manipulate the following files:
+
+- writelog.h
+- writelog.c
+- logger.c
+- carmen.ini
+
+- readlog.h
+- readlog.c
+- playback.c
+
+- Makefile
+
+
+Where to edit the individual files, and in what way
+===================================================
+
+----------- writelog.h -----------
+
+Include your module's interface at the top.
+
+Declare the function that will convert your sensor data messages to log file strings. Don't forget the doxygen comment block.
+	void carmen_logwrite_write_<module>_data( carmen_<module>_data_message *x_data,
+											carmen_FILE *outfile,
+											double timestamp );
+
+
+
+----------- writelog.c -----------
+
+Implement the function that we declared above. Position it where you positioned the declaration in the header file.
+Generally, try to keep things in the same order everywhere as you edit the files for consistency's sake.
+
+Document your message string in carmen_logwrite_write_header().
+
+
+
+----------- logger.c -----------
+
+Add a static int variable corresponding to the carmen.ini config variable.
+	static int log_<module> = 1;
+
+Add that variable to the param_list:
+	{"logger", "<module>",     CARMEN_PARAM_ONOFF, &log_<module>, 0, NULL},
+
+Copy/paste and edit a data handler function. For the fprintf, pick an unused letter. Remember the
+function we added to writelog.c? It's called here.
+	void <module>_data_handler(carmen_<module>_data_message *x_data)
+	{
+		fprintf(stderr,"X");
+		carmen_logwrite_write_<module>_data(x_data, outfile, carmen_get_time() - logger_starttime);
+	}
+
+Further below, subscribe to your module's sensor data message:
+	if (log_<module>) {
+		carmen_<module>_subscribe_data_message( NULL, (carmen_handler_t) <module>_data_handler, CARMEN_SUBSCRIBE_ALL ) ;
+	}
+
+
+
+----------- carmen.ini ------------
+
+Add a on/off variable to the logger section. Use the same name as in logger.c!
+
+
+
+----------- readlog.h ------------
+
+Declare a function that will convert a log file string back to your module's sensor message. Again, don't forget the doxygen block.
+	char *carmen_string_to_<module>_data_message( char *string,
+												carmen_<module>_data_message *x_msg );
+
+
+
+----------- readlog.c ------------
+
+Implement the function declared in readlog.h
+If your messages have a dynamic size, i.e. if you have to allocate data here, remember to
+a) check memory allocation with carmen_test_alloc()
+b) de-allocate after use. This will be done in playback.c. 
+
+
+
+----------- playback.c -----------
+
+Include your module interface at the top.
+
+Create an instance of your message as a global variable:
+	carmen_<module>_data_message   x_data;
+
+Define your message in register_ipc_messages().
+
+Add your converter function (from readlog.c) to the logger_callbacks[] array. Take care to use the same logger_message_name
+that you first invented in your log writing function in writelog.c!
+
+If you allocated memory in your conversion function in readlog.c, de-allocate it here. It should be safe to do so in
+read_message(), where the VISILOC module does just that.
+
+Initialize your message instance in main() with
+	memset(&x_data, 0, sizeof(x_data));
+
+
+
+----------- Makefile -----------
+
+Make sure your module interface library is included in the linker flags. 

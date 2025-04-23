@@ -1,0 +1,315 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sport Hub Portal</title>
+<meta name="description" content="Launching Next showcases the world's most promising new startups every day."/>
+<meta name="keywords" content="startups, new startups, startup ideas, great business ideas, tech startups, mobile startups, green startups, web startups"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<script src="../lib/js/jquery-1.11.3.min.js"></script>
+<script src="../lib/js/bootstrap.min.js"></script>
+<script src="../lib/js/custom.js"></script>
+<script src="../lib/js/bootstrap-datetimepicker.min.js"></script>
+<link rel="stylesheet" href="../lib/css/bootstrap.min.css" media="screen">
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.4.0/css/font-awesome.min.css">
+<link rel="stylesheet" href="../lib/css/custom.css">
+<link rel="stylesheet" href="../lib/css/nav.css">
+<link rel="stylesheet" href="../lib/css/bootstrap-datetimepicker.css">
+<link rel="stylesheet" href="../lib/css/font-awesome.min.css">
+<style>
+          #map {
+            height: 600px;
+          }
+        </style>
+</head>
+<body id="home">
+<div class="navbar navbar-default navbar-fixed-top navbar-transparent">
+<div class="container">
+<div class="navbar-header">
+<!--<a href="/" class="navbar-brand"><img class="logo" src="../images/PSAI_Logo.png" alt="" /></a>-->
+<button class="navbar-toggle" type="button" data-toggle="collapse" data-target="#navbar-main">
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+<span class="icon-bar"></span>
+</button>
+</div>
+<div class="navbar-collapse collapse" id="navbar-main">
+
+<!--
+<ul class="nav navbar-nav navbar-right">
+<li><a href="./geofences.html"><i class="icon-map-marker"></i> &nbsp;Check location</a></li>
+<li><a href="./markers.html"><i class="icon-map-marker"></i> &nbsp;Current location</a></li>
+<li><a href="./animations.html"><i class="icon-globe"></i> &nbsp;Historical location</a></li>
+<li><a href="./dataMonitor.html"><i class="icon-desktop"></i> &nbsp;Data Monitoring</a></li>
+<li><a href="./beacon.html"><i class="icon-signal"></i> &nbsp;Beacon</a></li>
+<li><a href="/"><i class="icon-signin"></i> &nbsp;Sign in</a></li>
+<li><a href="/"><i class="icon-signout"></i> &nbsp;Sign out</a></li>
+</ul>
+-->
+</div>
+</div>
+</div>
+<div class="splash" style="margin-top:-30px">
+<div class="container">
+
+<div>
+<label for="mce-EMAIL" style="padding-bottom:4px; font-size:30px">Test result-Phone 2</label>
+</div>
+
+</div>
+</div>
+
+<div class="section-preview">
+<div class="container">
+<div class="row" style="margin-bottom:20px;margin-left:0px;"><p><span class="group_day"><i class="icon-map-marker" style="color:#f39c12;"></i> Sporthub</span> <span class="group_date">Map</span>
+<span class="group_day" style="font-size:15px;float:right"><img src="http://maps.google.com/mapfiles/ms/icons/green-dot.png" style="width:20px;height:20px"/>groundtruth</span>
+
+<span class="group_day" style="font-size:15px;float:right"><img src="http://maps.google.com/mapfiles/ms/icons/red-dot.png" style="width:20px;height:20px"/>estimated location</span>
+
+
+</p></div>
+</div>
+<div class="container" id="map"></div>
+</div>
+
+
+<script>
+
+         var sampletime=["2016-04-19 13:44:00",
+
+        "2016-04-19 13:51:00",
+
+        "2016-04-19 13:58:00",
+
+        "2016-04-19 14:07:20",
+
+        "2016-04-19 14:16:00",
+
+        "2016-04-19 14:35:00",
+
+        "2016-04-19 14:42:00",
+
+        "2016-04-19 14:51:00",
+
+        "2016-04-19 14:58:00",
+
+        "2016-04-19 15:05:00",
+
+        "2016-04-19 15:12:00",
+
+        "2016-04-19 15:18:30",
+
+        "2016-04-19 15:25:00",
+
+        "2016-04-19 15:34:00",
+
+        "2016-04-19 15:41:00",
+
+        "2016-04-19 15:47:30",
+
+        "2016-04-19 15:54:30",
+
+        "2016-04-19 15:59:30",
+
+        "2016-04-19 16:07:00",
+
+        "2016-04-19 16:13:20"
+
+        ];
+
+  var phonename=["356090065296353","356090065296577"];
+
+
+
+var groundtrue=[
+
+        [1.3048033471,103.8732496963],
+
+        [1.3050259127,103.8733613491],
+
+        [1.3051975295,103.873500824],
+
+        [1.3053557388,103.8736617565],
+
+        [1.3054817699,103.8738200068],
+
+        [1.3055863489,103.8740023971],
+
+        [1.3056641128,103.8742035627],
+
+        [1.3056855649,103.8743913174],
+
+        [1.3056775203,103.8746112585],
+
+        [1.3056667934,103.8747534156],
+
+        [1.3056372977,103.8748847438],
+
+        [1.3055836674,103.8750327653],
+
+        [1.3054951775,103.8751932979],
+
+        [1.3052913825,103.8753890991],
+
+        [1.3050634539,103.8755500317],
+
+        [1.304891837,103.8756063581],
+
+        [1.3047041331,103.8756385446],
+
+        [1.3045673739,103.8756492734],
+
+        [1.3044306167,103.8756358624],
+
+        [1.3040498417,103.8755366206]
+
+        ];
+
+ function initMap() { 
+    
+            //alert(res.length);      
+      var map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 18,
+        scaleControl: true,
+	center: {lat: 1.304318, lng: 103.874345}
+      });
+      
+        for(var n=0; n<sampletime.length; n++){
+//        $.getJSON("../markers/getLocation2Data.php?phoneName=" +phonename[0]+"&startTime="+ encodeURIComponent(sampletime[n]), function(res){  
+
+//         for (var i = 0; i < res.length; i++) {
+
+                //alert(parseFloat(res[i].longitude));
+
+                //alert(parseFloat(res[i].latitude));
+
+//                var latLng = {lat: parseFloat(res[i].latitude), lng: parseFloat(res[i].longitude)};
+
+//                message = '<div><p>Name: ' + res[i].user_id + '</p><p>Map: ' + res[i].map_id + '</p><p>Time: ' + res[i].timestamp + '</p></div>';
+
+//                    var icon = 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+
+
+
+
+
+//                addMarkerMessage(latLng, message, map, icon);
+
+//            }
+
+//        });     
+        $.getJSON("../markers/getLocation2Data.php?phoneName=" +phonename[1]+"&startTime="+ encodeURIComponent(sampletime[n]), function(res){  
+
+        
+
+        for (var i = 0; i < res.length; i++) {
+
+                //alert(parseFloat(res[i].longitude));
+
+                //alert(parseFloat(res[i].latitude));
+
+                var latLng = {lat: parseFloat(res[i].latitude), lng: parseFloat(res[i].longitude)};
+
+                message = '<div><p>Name: ' + res[i].user_id + '</p><p>Map: ' + res[i].map_id + '</p><p>Time: ' + res[i].timestamp + '</p></div>';
+
+                    var icon = 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+
+
+
+
+
+                addMarkerMessage(latLng, message, map, icon);
+
+            }
+
+        });     
+ }
+        
+        for(j=0;j<groundtrue.length;j++){
+
+        
+
+        var latLng ={lat:groundtrue[j][0], lng:groundtrue[j][1]};
+
+        message='<div><p>Time: ' +sampletime[j] + '</p></div>'; 
+
+        var icon = 'http://maps.google.com/mapfiles/ms/icons/green-dot.png';
+
+        addMarkerMessage(latLng, message, map, icon);
+
+        }
+
+	 $.getJSON("../markers/getApLocation.php", function(res){  
+
+                for (var i = 0; i < res.length; i++) {
+
+                //alert(parseFloat(res[i].longitude));
+
+                //alert(parseFloat(res[i].latitude));
+
+                var latLng = {lat: parseFloat(res[i].latitude), lng: parseFloat(res[i].longitude)};
+
+                message = '<div><p>Mac address: ' + res[i].mac_address + '</p><p>Map: ' + res[i].map_id +'</p></div>';
+                var icon = '../images/ap1.png';
+                addMarkerMessage(latLng, message, map, icon);
+
+            }
+
+        });    
+
+        
+
+    }
+    function addMarkerMessage(location, message, map, icon) {
+        var marker = new google.maps.Marker({
+            position: location,
+            map: map,
+            animation: google.maps.Animation.DROP,
+            icon: icon
+        });
+        attachMessage(marker, message);
+    }
+
+    function attachMessage(marker, message) {
+      var infowindow = new google.maps.InfoWindow({
+        content: message
+      });
+
+      marker.addListener('click', function() {
+        infowindow.open(marker.get('map'), marker);
+      });
+    }
+
+
+</script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAXizYVi-zbXV0A8cHw0rlHt4YmqCpZDSI&callback=initMap&signed_in=true" async defer>
+    </script>
+
+    <!-- datetimepicker js -->
+        <script type="text/javascript">
+        $('#form_datetime-st').datetimepicker(
+                        {format:'yyyy-mm-dd hh:ii', pickerPosition:'bottom-right'});
+        $('#form_datetime-et').datetimepicker(
+                        {format:'yyyy-mm-dd hh:ii', pickerPosition:'bottom-right'});
+    </script>
+
+<div class="section-footer">
+<div class="container">
+<footer id="footer">
+<div class="row">
+<div class="col-lg-12">
+<ul class="list-unstyled">
+<li class="pull-right"><a href="#top">Back to top</a></li>
+
+</ul>
+</div>
+</div>
+</footer>
+</div>
+</div>
+
+</body>
+</html>
+
+

@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+<meta  name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>indoor_location_module</title>
+<meta name="description" content="indoor_location_module" />
+<meta name="keywords" content="indoor location" />
+<meta name="author" content="ZJ SUTD" />
+<link rel="shortcut icon" href="../images/tmp.png">
+<!-- 全局样式 CSS文件 -->
+<link rel="stylesheet" href="../css/normalize.css" />
+<!-- 用户样式 CSS文件 -->
+<link rel="stylesheet" href="../css/indoor_loca_mod.css" />
+<!-- jQuery文件 -->
+<script src="../js/jquery-2.0.3.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>INDOOR LOCATION MODULE</h1>
+</header>
+<div class="area-fingerprint"> 
+	  signal strength rank:
+	  <input id="signal_strength_rank"> 
+	  <input type="button" name="button" value="获取" onClick="getStrengthRank()" />
+  mouse_pointx:
+  <input id="mouse_pointx">
+  mouse_pointy:
+  <input id="mouse_pointy">
+  Areas_Finger_Print:<span id="finger_print_a"></span>&nbsp;<span id="finger_print_b"></span>&nbsp;<span id="finger_print_c"></span>&nbsp;<span id="finger_print_d"></span> </div>
+<div id="my_painter">
+  <canvas id="myCanvas" width="1500" height="550"></canvas>
+</div>
+<div>
+	<input type="button" name="button" value="训练" onClick="getMapData()" />
+</div>
+<div><input type="hidden" id="fpmap_array" value=""></div>
+<!--canvas JavaScript文件-->
+<script type="text/javascript" src="../js/indoor_loca_mod.js"></script>
+</body>
+</html>

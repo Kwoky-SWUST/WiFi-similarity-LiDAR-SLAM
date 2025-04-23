@@ -1,0 +1,17 @@
+/levenshtein.c/1.1.1.1/Wed May 19 02:44:34 2004//
+D/html////
+D/include////
+D/swig////
+D/sys////
+D/test////
+/LICENSE/1.2/Wed May 19 03:03:35 2004//
+/README/1.2/Wed May 19 03:03:35 2004//
+/mod_levenshtein.c/1.2/Wed May 19 03:03:35 2004//
+/hamming.c/1.2/Wed May 19 14:02:44 2004//
+/bloom.c/1.5/Thu May 20 00:38:01 2004//
+/jaccard.c/1.2/Thu May 20 00:38:01 2004//
+/GNUmakefile/1.4/Thu May 20 03:12:38 2004//
+/Makefile/1.4/Thu May 20 03:12:38 2004//
+/distance.3/1.5/Thu May 20 03:12:38 2004//
+/distance.h/1.4/Thu May 20 03:12:38 2004//
+/minkowski.c/1.2/Thu May 20 03:17:41 2004//

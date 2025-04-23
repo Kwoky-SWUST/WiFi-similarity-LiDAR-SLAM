@@ -1,0 +1,50 @@
+
+GnuplotInterface* m_plotGroundTruth=new GnuplotInterface();
+
+/*
+    ///plot
+    string cmd;//( "set size ratio 1\n");
+
+    cmd+="set grid\n";
+    cmd+="set xlabel 'x(m)'\n";
+    cmd+="set ylabel 'y(m)'\n";
+    cmd+="set title 'trajectories'\n";
+
+    cmd+="plot ["+toString(m_dBinningMinX)+':'+toString(m_dBinningMaxX)+"]["+toString(m_dBinningMinY)+':'+toString(m_dBinningMaxY)+"] ";
+    //we should set some users the user should use different lines or colors
+    UsersTrajectory::iterator iterator;
+    int line_style=1;
+    for(iterator = m_interpolated_ground_truth.begin(); iterator != m_interpolated_ground_truth.end(); ++iterator)
+    {
+        cmd+="'-' u 1:2 w p pt "+toString(line_style)+" lc "+toString(line_style)+" ti '"+iterator->first+" ground truth',";
+        line_style=line_style+1;
+
+    }
+
+    cmd+="\n";
+
+    for(iterator = m_interpolated_ground_truth.begin(); iterator != m_interpolated_ground_truth.end(); ++iterator)
+    {
+        for(int i=0;i<int(iterator->second.positions.size());i=i+1)
+        {
+
+            cmd += toString( iterator->second.positions[i].x ) + ' ' + toString(iterator->second.positions[i].y ) + ' ' + toString( 0.5 ) + '\n';
+            //if(iterator->first=="User00")
+            //std::cout<<iterator->first<<" "<<iterator->second.positions[i].x<<" "<<iterator->second.positions[i].y<<std::endl;
+
+        }
+        cmd += "e\n";
+    }
+
+    m_plotGroundTruth->commandStr( cmd );
+
+
+
+-----
+Dr. Ran Liu
+​Engineering Product Development (EP​D)
+Singapore University of Technology and Design (SUTD)
+8 Somapah Road, 487372, Singapore​
+​
+ 
+

@@ -1,0 +1,37 @@
+python interface to the distance library.
+
+example usage:
+
+>>> import distance
+>>> str1 = 'hello'
+>>> str2 = 'hlelo'
+>>> distance.levenshtein(str1, str2)
+2
+>>> distance.damerau(str1, str2)
+0
+>>> distance.hamming(str1, str2)
+2
+>>> distance.minkowski(str1, str2, 3)
+29.0
+>>> distance.euclid(str1, str2)
+11.0
+>>> distance.manhattan(str1, str2)
+4.0
+>>> f = open('setup.py')
+>>> str1 = f.read()
+>>> f.close()
+>>> f= open('/Users/josenazario/src/pynids-0.5/setup.py')
+>>> str2 = f.read()
+>>> f.close()
+>>> distance.levenshtein(str1, str2)
+2317
+>>> distance.damerau(str1, str2)
+2312
+>>> m = distance.nw_matrix(insertion=1,conversion=1)
+>>> s1 = "hay"
+>>> s2 = "h@y"
+>>> print distance.needleman_wunsch(s1, s2, m)
+1.0
+>>> m.setConversion("a", "@", 0.1)
+>>> print distance.needleman_wunsch(s1, s2, m)
+0.10000000149

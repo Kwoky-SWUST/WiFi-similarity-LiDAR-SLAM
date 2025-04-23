@@ -1,0 +1,11 @@
+#map information
+map_name Block2_Level7
+map_min_x -16
+map_max_x 25
+map_min_y 0
+map_max_y 24
+map_resolution 0.5
+#number of APs ap1_x ap1_y ap2_x ap2_y....
+ap_info 7 17.7 10.3 10.0 14.1 5.5 0.9 25.0 10.5 25.0 4.9 15.5 0.9 2.0 10.0
+#number of FMs fm1_x fm1_y fm2_x fm2_y....
+fm_info 7 17.7 10.3 10.0 14.1 5.5 0.9 25.0 10.5 25.0 4.9 15.5 0.9 2.0 10.0

@@ -1,0 +1,18 @@
+D/html////
+D/include////
+D/swig////
+D/test////
+/LICENSE/1.2/Sat Nov 27 21:10:42 2004//
+/Makefile/1.5/Mon Nov 29 21:42:14 2004//
+/bloom.c/1.6/Mon Nov 29 21:43:15 2004//
+/damerau.c/1.1/Mon Nov 29 21:43:35 2004//
+/needleman_wunsch.c/1.1/Mon Nov 29 21:44:48 2004//
+/GNUmakefile/1.5/Mon Nov 29 21:48:08 2004//
+/distance.3/1.6/Mon Nov 29 22:08:23 2004//
+/distance.h/1.6/Mon Nov 29 22:08:23 2004//
+/hamming.c/1.3/Mon Nov 29 22:08:48 2004//
+/levenshtein.c/1.2/Mon Nov 29 22:08:48 2004//
+/jaccard.c/1.3/Mon Nov 29 22:09:02 2004//
+/README/1.3/Mon Nov 29 22:30:16 2004//
+/minkowski.c/1.4/Tue Nov 30 00:19:36 2004//
+D/sys-needed-for-windows////

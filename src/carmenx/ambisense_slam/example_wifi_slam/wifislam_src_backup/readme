@@ -1,0 +1,11 @@
+//first dataset
+./efficient_wifi_slam -fingerprints ./datasets/2019_11_15_ntu/2019_11_15/Cell_Log_1.csv -robotOdom ./datasets/2019_11_15_ntu/robot_odom_readings/wheel_odom_2019-11-15-14-07-06.txt -groundTruth ./datasets/2019_11_15_ntu/nov15_experiment1_pose_gt 
+
+
+//second dataset
+./efficient_wifi_slam -fingerprints ./datasets/2019_11_15_ntu/2019_11_15/Cell_Log_2.csv -robotOdom ./datasets/2019_11_15_ntu/robot_odom_readings/wheel_odom_2019-11-15-16-32-48.txt -groundTruth ./datasets/2019_11_15_ntu/nov15_experiment2_pose_gt 
+
+
+//third dataset 
+./efficient_wifi_slam -fingerprints ./datasets/2019_11_15_ntu/2019_11_15/Cell_Log_3.csv -robotOdom ./datasets/2019_11_15_ntu/robot_odom_readings/wheel_odom_2019-11-15-18-23-18.txt -groundTruth ./datasets/2019_11_15_ntu/nov15_experiment3_pose_gt 
+

@@ -1,0 +1,25 @@
+Php files for psa:
+
+insert the gps attached to one of the aps to the database
+db_ap_config.php: database configure, for example username, ip, database name;
+db_ap_connect.php: connect to the database;
+insertAPData.php: insert AP GPS information to the database;
+insertPSABeaconData.php:insert scanned beacon information to the database;
+insertPSAGPSMobileData.php:insert GPS data from mobile phones to the database;
+insertPSAWifiData.php:insert wifi data scanner from mobile phones to database;
+
+
+for the indoor relative positioning:
+
+operations of the IMU data:
+db_config.php:IMU database configure, for example username, ip, database name;
+db_connect.php: connect to the IMU database;
+insertData.php: insert a data to the IMU database;
+
+operation of the FM data:
+db_fm_config.php:FM database configure, for example username, ip, database name;
+db_fm_connect.php: connect to the FM database;
+insertFMData.php: insert a data to the FM database;
+
+
+getData.php: retrieve data from a database, currently not used

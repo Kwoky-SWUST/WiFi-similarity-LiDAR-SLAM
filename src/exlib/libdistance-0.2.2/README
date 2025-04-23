@@ -1,0 +1,46 @@
+$Id: README,v 1.3 2004/11/29 22:30:16 jose Exp $
+
+-----[ libdistance
+
+The distance library is used to compare pieces of data for similarity.
+Specifically, it contains a number of methods to find the "edit distance"
+between inputs, or the number of differences between them. These differ-
+ences are calculated using various mechanisms. The inputs to these functions
+can be character strings or arbitrary data.
+
+Inputs are operated on pairwise as *s and *t and the edit distance value
+is returned.
+
+----[ references
+
+http://www.merriampark.com/ld.htm
+http://www.nist.gov/dads/HTML/editdistance.html
+http://www.nist.gov/dads/HTML/hammingdist.html
+http://www.nist.gov/dads/HTML/bloomfilt.html
+
+-----[ installation
+
+Build libdistance using BSD make, it's been tested on OpenBSD and OS X.
+Install as root for system wide installations. Note that you need to
+install both libdistance and distance.h in the appropriate locations.
+
+If you want to access libdistance from either Tcl or Python, you can 
+use the bindings built in the "swig" subdirectory. If you don't have SWIG,
+you can edit the top level Makefile to remove the subdirectory "swig" from
+the SUBDIR variable.
+
+If you're building this on Win32 using MinGW, rename the directory
+sys-needed-for-windows/ to sys/ and run "make".
+
+-----[ authors
+
+Lorenzo Seidenari wrote the Levenshtein distance implementation.
+
+Jose Nazario <jose@monkey.org> wrote the implementation of the Hamming
+distance algorithm and the original modifications to the Levenshtein
+distance algorithm and ported the software to Win32 using MinGW.
+
+Evan Cooke adapted the adler32 routine from Jean-loup Gailly and Mark
+Adler used in the bloom_distance() function.
+
+See the manpage for the full list of author credits.

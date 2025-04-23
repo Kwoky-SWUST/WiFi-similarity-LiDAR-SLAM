@@ -1,0 +1,81 @@
+SHELL = /bin/bash
+
+ML_ROOT_DIR = `if [[ -e /opt/MetraLabs ]]; then echo "/opt/MetraLabs"; else echo "$(SCIROCO_BASE_DIR)/src/extlib/scitos"; fi`
+
+OPENCV_INCLUDE = `pkg-config --exists opencv; opencvresult=$$?; \
+	if [ $$opencvresult == "0" ]; then \
+		pkg-config --cflags opencv; \
+	else \
+		echo "-I$(SCIROCO_BASE_DIR)/src/extlib/opencv-1.0.0/include/opencv"; \
+	fi;`
+
+OPENCV_LIB = `pkg-config --exists opencv; opencvresult=$$?; \
+	if [ $$opencvresult == "0" ]; then \
+		pkg-config --libs opencv; \
+	else \
+		echo "-I$(SCIROCO_BASE_DIR)/src/extlib/opencv-1.0.0/lib"; \
+	fi;`
+
+QWT_LIB = `if [ -f /usr/lib/libqwt.so ]; then \
+		echo "-lqwt"; \
+	else \
+		echo "-L$(SCIROCO_BASE_DIR)/src/extlib/qwt/lib -lqwt"; \
+	fi;`
+
+XSTREAM_INCLUDE_DIR = $(SCIROCO_BASE_DIR)/src/extlib/xstream/include
+XSTREAM_LIB_DIR     = $(SCIROCO_BASE_DIR)/src/extlib/xstream/src
+
+IFLAGS   += -I. \
+	-I$(SCIROCO_BASE_DIR)/src/ \
+	-I$(SCIROCO_BASE_DIR)/src/carmenx \
+	-I$(SCIROCO_BASE_DIR)/src/extlib/ \
+	-I$(SCIROCO_BASE_DIR)/src/extlib/carmen/ \
+	-I$(SCIROCO_BASE_DIR)/src/extlib/carmen/include
+
+LFLAGS += -L$(SCIROCO_BASE_DIR)/lib \
+	-L$(SCIROCO_BASE_DIR)/src/extlib/carmen/lib
+
+QT4INCLUDES  = `pkg-config --cflags QtCore `
+QT4INCLUDES += `pkg-config --cflags QtGui `
+QT4INCLUDES += `pkg-config --cflags Qt3Support `
+
+QT4LIBS  = `pkg-config --libs QtCore`
+QT4LIBS += `pkg-config --libs QtGui`
+QT4LIBS += `pkg-config --libs Qt3Support`
+
+QT4DIR = `whereis qt4 | awk '{ print $$2;}'`
+
+
+#QT4INCLUDES = -DQT_SHARED -I/usr/lib/qt4/include/QtGui -I/usr/lib/qt4/include/QtCore -I/usr/lib/qt4/include/Qt3Support
+
+
+moc_%.o: %.h
+	$(ECHO) "    ---- Creating QT MOC file $(patsubst %.h,moc_%.cpp,$<) for $<"
+	$(QTDIR)/bin/moc $< -o $(patsubst %.h,moc_%.cpp,$<)
+	$(ECHO) "    ---- Compiling $(patsubst %.h,moc_%.cpp,$<) to $@ (C++)"
+	$(SILENT) $(CC) $(CFLAGS) $(IFLAGS) -c $(patsubst %.h,moc_%.cpp,$<) -o $@
+#	$(ECHO) "    ---- Creating QT 4 MOC file $(patsubst %.h,moc_%.cpp,$<) for $<"
+#	$(QT4DIR)/bin/moc $< -o $(patsubst %.h,moc_%.cpp,$<)
+#	$(ECHO) "    ---- Compiling $(patsubst %.h,moc_%.cpp,$<) to $@ (C++)"
+#	$(SILENT) $(CC) $(CFLAGS) $(IFLAGS) -c $(patsubst %.h,moc_%.cpp,$<) -o $@
+
+
+
+#
+
+
+%.so.1:
+	$(ECHO) "    ---- Archiving $^ into $@ (C)"
+	$(SILENT) $(CXX) -shared -o $@ $(filter-out %.subdir, $^)
+
+%.so:
+	$(ECHO) "    ---- Archiving $^ into $@ (C)"
+	$(SILENT) $(CXX) -shared -o $@ $(filter-out %.subdir, $^)
+
+%.doxygen:
+	$(ECHO) "    ---- Compiling $< (Doxygen)"
+	$(SILENT) $(DOXYGEN) $<
+
+%:
+	$(ECHO) "    ---- Linking $^ to $@ (C)"
+	$(SILENT) $(LINK) $(CFLAGS) $(IFLAGS) $(filter %.o, $^) $(filter %.a, $^) -o $@ -L. $(patsubst lib%.a,-l%,$(filter %.a, $^)) $(LFLAGS) $(LFLAGS_POST)

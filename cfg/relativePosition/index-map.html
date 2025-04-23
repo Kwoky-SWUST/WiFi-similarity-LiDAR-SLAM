@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+    .dot circle {
+        fill: lightsteelblue;
+        stroke: steelblue;
+        stroke-width: 1.5px;
+    }
+
+    .dot circle.dragging {
+        fill: red;
+        stroke: brown;
+    }
+
+    .axis line {
+        fill: none;
+        stroke: #ddd;
+        shape-rendering: crispEdges;
+        vector-effect: non-scaling-stroke;
+    }
+   /* .tips {
+      pointer-events: none;
+      display:none;
+
+    }*/
+    .text-style{
+       font-size: 25px;
+    }
+    .tips-border{
+        fill: rgba(255,0,0,0);
+        stroke: grey;
+        stroke-width: 5;
+
+    }
+
+</style>
+<body style = "text-align:center;">
+<script src="./js/d3.v3.min.js"></script>
+<script  type="text/javascript" src="./js/jquery-2.1.3.min.js"></script>
+<script language="javascript"> function myfresh(){window.location.reload();}setTimeout('myfresh()',600000);</script>
+<script>
+
+    //define the SVG width and height
+    var positions = new Array();
+    var idNum=-1;
+    var central="";
+    var enlarge=1;
+    var enlargePx = 10;
+
+    var margin = {top: -5, right: -5, bottom: -5, left: -5},
+            width = 1024*2 - margin.left - margin.right,
+            height = 768*2 - margin.top - margin.bottom;
+
+    var zoom = d3.behavior.zoom()
+            .scaleExtent([1, 10])
+            .on("zoom", zoomed);
+
+    var drag = d3.behavior.drag()
+            .origin(function(d) { return d; })
+            .on("dragstart", dragstarted)
+            .on("drag", dragged)
+            .on("dragend", dragended);
+
+    //insert SVG container to body
+    var svg = d3.select("body").append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", "translate(" + margin.left + "," + margin.right + ")")
+            .call(zoom);
+
+    //insert rect
+    var rect = svg.append("rect")
+            .attr("width", width)
+            .attr("height", height)
+            .style("fill", "none")
+            .style("pointer-events", "all");
+
+    var container = svg.append("g");
+
+    container.append("g")
+            .attr("class", "x axis")
+            .selectAll("line")
+            .data(d3.range(0, width, 10))
+            .enter().append("line")
+            .attr("x1", function(d) { return d; })
+            .attr("y1", 0)
+            .attr("x2", function(d) { return d; })
+            .attr("y2", height);
+
+    container.append("g")
+            .attr("class", "y axis")
+            .selectAll("line")
+            .data(d3.range(0, height, 10))
+            .enter().append("line")
+            .attr("x1", 0)
+            .attr("y1", function(d) { return d; })
+            .attr("x2", width)
+            .attr("y2", function(d) { return d; });
+
+    var arr =[];
+    function dottype(d) {
+        d.x = +d.x;
+        d.y = +d.y;
+        return d;
+    }
+
+    function getURLParam(name) {
+        var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
+        var r = window.location.search.substr(1).match(reg);
+        if (r != null) {
+            return unescape(r[2]);
+        }
+        return null;
+    }
+
+    central = getURLParam("central");
+
+    function zoomed() {
+        //console.log("translate", d3.event.translate);
+        //console.log("scale",d3.event.scale);
+        //container.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+
+        enlarge = d3.event.scale;
+    }
+
+    function dragstarted(d) {
+        d3.event.sourceEvent.stopPropagation();
+        d3.select(this).classed("dragging", true);
+    }
+
+    function dragged(d) {
+        d3.select(this).attr("cx", d.x = d3.event.x).attr("cy", d.y = d3.event.y);
+    }
+
+    function dragended(d) {
+        d3.select(this).classed("dragging", false);
+    }
+
+    setTimeout("timeRefresh()",3);
+
+    function timeRefresh() {
+       //  var time1 = new Date().getTime();
+      //  console.log("1:" + time1);
+        getLocationDataAsyn();
+      //   var time2 = new Date().getTime();
+     //   console.log("2:" + time2);
+        setTimeout("timeRefresh()",1000);
+     }
+
+    function getLocationDataAsyn() {
+        
+        $.getJSON("./point_trace_show.php?id=" + idNum + "&central=" + central,function(results){
+        	container.selectAll("circle").remove();
+		container.selectAll("text").remove();   
+                container.selectAll("rect").remove();
+//              arr = [];
+            $.each(results.locations, function(i, result){
+                idNum = result.id;
+                var flag = 0;
+                position = {user:result.user_id, color:result.color, x:result.location_x, y:result.location_y};
+               
+                
+              for (var i = 0; i < arr.length; i++) {
+                    if (arr[i].user == position.user) {
+                        arr[i].color = position.color;
+                        arr[i].x = position.x;
+                        arr[i].y = position.y;
+                        flag = 1;
+                    }
+                }
+                
+                console.log(arr.length);
+                if (flag == 0) {
+                    arr.push(position);
+                }
+       
+               container.selectAll("circle").remove();
+               container.selectAll("circle")
+                        .data(arr)
+                        .enter()
+                        .append("circle")
+                        .attr("cx",function(d){return d.x*enlargePx*enlarge + width/2})
+                        .attr("cy",function(d){return d.y*enlargePx*enlarge + height/2})
+                        .attr("r",5)
+                        .style("fill",function(d){return d.color})
+                        .call(drag)
+     
+    
+      var tips =container.attr("class","tips");
+                container.selectAll("rect").remove();
+                     tips.append("rect")
+                         .attr("class","tips-border")
+                         .attr("width",150)
+                         .attr("height",(arr.length + 1)*42)
+                         .attr("rx",10)
+                         .attr("ry",10)
+           
+         
+         //  container.selectAll("circle").remove();
+           container.selectAll("text").remove();   
+          
+      for(i=0; i<arr.length;i++){
+          var wording = tips.append("circle")
+                            .data(arr)
+                            .attr("cx",20)
+                            .attr("cy",(i + 1)*40)
+                            .attr("r", 3)
+                            .style("fill", arr[i].color)
+                        tips.append("text")
+                            .attr("class","text-style")
+                            .attr("x",40)
+                            .attr("y",(i+1)*42)
+                            .text(arr[i].user)
+
+}
+                            
+ });
+
+
+ });
+
+
+    }
+
+</script>
+

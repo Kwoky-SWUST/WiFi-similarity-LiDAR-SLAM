@@ -1,0 +1,35 @@
+@CHARSET "UTF-8";
+/* CSS Document */
+header{
+	width:100%;
+	text-align:center;
+	padding:10px 0;
+}
+.iniPara{
+	text-align:center;
+	padding-bottom:15px;
+}
+.mouseMoveParaShow{
+	text-align:center;
+	padding-bottom:15px;
+}
+.resultQuery{
+	text-align:center;
+	padding-bottom:15px;
+}
+.trainButton{
+	text-align:center;
+	padding-bottom:15px;
+}
+#my_painter{
+
+}
+.trace{
+	margin:20px;
+	text-align:center;
+}
+
+.trace input{
+	width:80px;
+	height:40px;
+}

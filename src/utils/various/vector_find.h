@@ -1,0 +1,1 @@
+inline int vector_find( std::vector & v,
