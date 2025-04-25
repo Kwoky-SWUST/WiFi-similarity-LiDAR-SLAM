@@ -1,8 +1,0 @@
-* This is the code for WiFi similarity based SLAM *
-
-1. go to src/exlib/carmen/src and run ./configure,
-2. when asked to select the laser info, please use NO,
-3. when asked to choose the robot, select 6
-4. compile this folder
-5. go back to exlib and try to compile the rest
-6. wifi slam is located in carmenx/ambisense_slam/example_wifi_slam
