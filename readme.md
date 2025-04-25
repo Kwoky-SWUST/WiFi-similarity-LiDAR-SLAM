@@ -1,4 +1,4 @@
-* This is the code for WiFi similarity based SLAM *
+# This is the code for WiFi similarity based SLAM 
 
 1. go to src/exlib/carmen/src and run ./configure,
 2. when asked to select the laser info, please use NO,
@@ -57,37 +57,4 @@ Before you begin, ensure you have the following installed:
 *   **WiFi Similarity:** Integrates WiFi signal strength information to improve SLAM accuracy and robustness.
 *   **Modular Design:** The code is organized into modules (e.g., `carmenx`, `exlib`, `utils`) for easier maintenance and extension.
 
-## 🤝 Contributing
 
-Contributions are welcome!  Here's how you can contribute:
-
-1.  **Fork the repository.**
-2.  **Create a new branch for your feature or bug fix.**
-3.  **Make your changes and commit them with clear, concise messages.**
-4.  **Submit a pull request.**
-
-Please follow these guidelines when contributing:
-
-*   **Code Style:** Adhere to the existing code style.
-*   **Testing:**  Write unit tests for your code.
-*   **Documentation:**  Document your code changes.
-
-## 🐛 Troubleshooting
-
-*   **Compilation Errors:**
-    *   Ensure that all dependencies are installed correctly.
-    *   Check the `Makefile.conf` file for correct paths to libraries and headers.
-    *   Verify that your C++ compiler supports the required language features.
-*   **Runtime Errors:**
-    *   Check the console output for error messages.
-    *   Use a debugger to step through the code and identify the source of the error.
-    *   Ensure that your LiDAR and WiFi drivers are properly configured.
-*   **SLAM Performance Issues:**
-    *   Tune the SLAM parameters for your specific environment.
-    *   Ensure that the LiDAR and WiFi data are properly calibrated.
-    *   Consider using a more powerful computer if the SLAM algorithm is too computationally intensive.
-
-## 🧑‍💻 Contributors
-
-*   Kwoky-SWUST
-```
